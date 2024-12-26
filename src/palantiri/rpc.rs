@@ -4,29 +4,22 @@ use std::time::{Duration, Instant};
 use alloy::hex;
 use async_trait::async_trait;
 use lru::LruCache;
+use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{fmt::Display, net::SocketAddr, sync::Arc};
 use std::sync::RwLock;
-
-use alloy::network::{ReceiptResponse, TransactionResponse};
 use alloy::primitives::{keccak256, Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 
+use crate::types::Block;
 
-#[derive(Debug, thiserror::Error)]
-pub enum RpcError {
-    #[error("Transport error: {0}")]
-    Transport(String),
-    #[error("Invalid response: {0}")]
-    Response(String),
-    #[error("Parse error: {0}")]
-    Parse(String),
-}
+use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
     async fn execute(&self, request: String) -> Result<String, RpcError>;
+    async fn execute_with_retry(&self, request: String, retry: usize) -> Result<String, RpcError>;
     async fn connect(&self) -> Result<(), RpcError>;
 
 }
@@ -66,6 +59,7 @@ pub struct RpcRequest {
     pub params: serde_json::Value,
     pub id: u64,
 }
+
 
 impl RequestCache {
     pub fn new(capacity: usize, ttl: Duration) -> Self {
@@ -144,7 +138,10 @@ impl RpcClient {
         self.execute_with_cache(request).await
     }
 
-    pub async fn get_block_by_number(&self, number: U64, full_tx: bool) -> Result<Value, RpcError> {
+      ///ISSUE
+      pub async fn get_block_number(&self) -> Result<Value, RpcError> {
+        let number = 64;
+        let full_tx = true;
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -155,8 +152,18 @@ impl RpcClient {
         self.execute_with_cache(request).await
     }
 
+    pub async fn get_block_by_number(&self, number: U64, full_tx: bool) -> Result<Block, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getBlockByNumber",
+            params: json!([format!("0x{:x}", number), full_tx]),
+            id: 1,
+        };
+        
+        self.execute_with_cache(request).await
+    }
 
-    pub async fn get_block_by_hash(&self, hash: FixedBytes<32>, full_tx: bool) -> Result<Value, RpcError> {
+    pub async fn get_block_by_hash(&self, hash: FixedBytes<32>, full_tx: bool) -> Result<Block, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -231,6 +238,16 @@ impl RpcClient {
             id: 1,
         };
 
+        self.execute_with_cache(request).await
+    }
+
+    pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getBlockReceipts",
+            params: json!([block]),
+            id: 1,
+        };
         self.execute_with_cache(request).await
     }
 

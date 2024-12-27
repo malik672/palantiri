@@ -4,7 +4,7 @@
 use alloy::primitives::{Address, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BlockHeader {
     pub parent_hash: B256,
     pub uncles_hash: B256,

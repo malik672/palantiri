@@ -413,6 +413,26 @@ impl ConsensusImpl {
     ) -> Result<(), ()> {
         todo!()
     }
+
+
+   pub async fn verify_block(&self, block: B256) -> Result<(), ConsensusError> {
+        let block = self
+            .rpc
+            .get_block_by_hash(block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+        if !self
+            .is_valid_parent(block.header.parent_hash)
+            .await
+            .expect("boolean: LINE 156")
+        {
+            return Err(ConsensusError::InvalidBlock("Invalid parent hash".into()));
+        }
+
+        Ok(())
+    }
+
 }
 
 #[async_trait::async_trait]

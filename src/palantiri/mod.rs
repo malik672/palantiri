@@ -6,6 +6,7 @@ use std::time::Duration;
 pub mod cache;
 pub mod rpc;
 pub mod transport;
+pub mod node;
 
 #[derive(Debug)]
 pub struct HttpTransport {

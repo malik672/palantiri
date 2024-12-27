@@ -152,7 +152,7 @@ impl RpcClient {
         self.execute_with_cache(request).await
     }
 
-    pub async fn get_block_by_number(&self, number: U64, full_tx: bool) -> Result<Block, RpcError> {
+    pub async fn get_block_by_number(&self, number: u64, full_tx: bool) -> Result<Block, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",

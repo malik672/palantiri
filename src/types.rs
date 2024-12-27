@@ -15,7 +15,7 @@ pub struct BlockHeader {
     ///ISSUE
     pub logs_bloom: B256,
     pub difficulty: U256,
-    pub number: U64,
+    pub number: u64,
     pub gas_limit: U256,
     pub gas_used: U256,
     pub timestamp: u64,

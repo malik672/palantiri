@@ -1,8 +1,9 @@
 use std::sync::{Arc, RwLock};
 
 use alloy::primitives::{Address, BlockHash, B256, U256};
+use reqwest::header;
 
-use crate::palantiri::rpc::RpcClient;
+use crate::{palantiri::rpc::RpcClient, types::BlockHeader};
 
 #[derive(Debug, Clone)]
 pub struct ConsensusConfig {
@@ -11,6 +12,7 @@ pub struct ConsensusConfig {
     pub genesis_hash: B256,
     pub finalized_block_hash: B256,
     pub sync_period: u64,
+    pub min_sync_comitee: u64,
 }
 
 #[derive(Debug)]
@@ -18,6 +20,7 @@ pub struct ConsensusState {
     pub current_block: u64,
     pub finalized_block: BlockHash,
     pub sync_status: SyncStatus,
+    pub min_sync_committee_participants: u64,
 }
 
 pub struct ConsensusImpl {
@@ -26,12 +29,29 @@ pub struct ConsensusImpl {
     rpc: Arc<RpcClient>,
 }
 
+#[derive(Debug)]
+pub struct SyncAggregate {
+    pub sync_committee_bits: u64,
+    pub sync_committee_signature: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct FinalityUpdate {
+    pub attested_header: BlockHeader,
+    pub finalized_header: BlockHeader,
+    pub finality_branch: Vec<B256>,
+    pub sync_aggregate: SyncAggregate,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum SyncStatus {
-    Syncing { target: u64, current: u64 },
+    Syncing {
+        target: u64,
+        current: u64,
+    },
     Synced,
     ///THE ERROR IS BASICALLY A FLIP, 1 FOR NON ERROR, 0 FOR ERROR
-    Err(u8)
+    Err(u8),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -42,6 +62,8 @@ pub enum ConsensusError {
     InvalidStateRoot(String),
     #[error("Sync error: {0}")]
     SyncError(String),
+    #[error("Invalid Signature")]
+    InvalidSignature,
 }
 
 #[async_trait::async_trait]
@@ -53,10 +75,10 @@ pub trait Concensus: Send + Sync {
 
     // Chain state & finality
     async fn is_finalized(&self, block: BlockHash) -> bool;
-    async fn get_finalized_head(&self) -> BlockHash;
+    async fn get_finalized_head(&self) -> Result<BlockHash, ConsensusError>;
 
     // Chain info
-    async fn chain_id(&self) -> u64;
+    async fn chain_id(&self) -> Result<u64, ConsensusError>;
     async fn genesis_hash(&self) -> B256;
     fn sync_status(&self) -> SyncStatus;
 
@@ -72,12 +94,67 @@ impl ConsensusImpl {
             current_block: config.finalized_block_number,
             finalized_block: config.finalized_block_hash,
             sync_status: SyncStatus::Synced,
+            min_sync_committee_participants: config.min_sync_comitee,
         };
 
         Self {
             config,
             state: RwLock::new(state),
             rpc,
+        }
+    }
+
+    pub async fn verify_block_range(&self, mut start: u64, end: u64) -> Result<(), ConsensusError> {
+        while start <= end {
+            let block = self
+                .rpc
+                .get_block_by_number(start, false)
+                .await
+                .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+            if !self.is_valid_parent(block.header.parent_hash).await? {
+                return Err(ConsensusError::InvalidBlock(
+                    "Invalid block sequence".into(),
+                ));
+            }
+
+            start += 1;
+        }
+
+        Ok(())
+    }
+
+    pub async fn is_finalized(&self, block: BlockHash) -> Result<bool, ConsensusError> {
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        let block_number = self
+            .rpc
+            .get_block_by_hash(block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?
+            .header
+            .number;
+
+        //ISSUE
+        Ok(block_number <= state.current_block)
+    }
+
+    pub async fn get_finalized_head(&self) -> Result<BlockHash, ConsensusError> {
+        self.state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))
+            .map(|state| state.finalized_block)
+    }
+
+    pub async fn chain_id(&self) -> Result<u64, ConsensusError> {
+        match self.rpc.get_chain_id().await {
+            Ok(id) => id
+                .as_u64()
+                .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
+            Err(e) => Err(ConsensusError::SyncError(e.to_string())),
         }
     }
 
@@ -102,6 +179,240 @@ impl ConsensusImpl {
         };
         Ok(())
     }
+
+    pub async fn update_finalized_head(&self, new_head: BlockHash) -> Result<(), ConsensusError> {
+        let mut state = self
+            .state
+            .write()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        let new_block = self
+            .rpc
+            .get_block_by_hash(new_head, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+        if new_block.header.number > state.current_block {
+            state.finalized_block = new_head;
+        }
+
+        Ok(())
+    }
+
+    pub async fn process_new_block(&self, block: BlockHash) -> Result<(), ConsensusError> {
+        let block_data = self
+            .rpc
+            .get_block_by_hash(block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+        let mut state = self
+            .state
+            .write()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        if block_data.header.number > state.current_block {
+            state.current_block = block_data.header.number;
+            state.sync_status = SyncStatus::Synced;
+        }
+
+        Ok(())
+    }
+
+    pub async fn process_blocks(&self, start: u64, end: u64) -> Result<(), ConsensusError> {
+        for number in start..=end {
+            let block = self
+                .rpc
+                .get_block_by_number(number, false)
+                .await
+                .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+            self.process_new_block(block.header.parent_hash).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn update_sync_status(&self) -> Result<(), ConsensusError> {
+        // let latest = self.rpc.get_block_number().await
+        //     .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
+
+        // let mut state = self.state.write().unwrap();
+
+        // state.sync_status = if latest > state.current_block {
+        //     SyncStatus::Syncing {
+        //         target: latest,
+        //         current: state.current_block,
+        //     }
+        // } else {
+        //     SyncStatus::Synced
+        // };
+
+        // Ok(())
+        todo!()
+    }
+
+    pub async fn sync_blocks(&self) -> Result<(), ConsensusError> {
+        let latest = self
+            .rpc
+            .get_block_number()
+            .await
+            .map_err(|e| ConsensusError::SyncError(e.to_string()))?
+            .as_u64()
+            .ok_or_else(|| ConsensusError::SyncError("Invalid block number".into()))?;
+
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        if latest <= state.current_block {
+            return Ok(());
+        }
+
+        // Process blocks in batches
+        let batch_size = 100;
+        let mut start = state.current_block + 1;
+
+        while start <= latest {
+            let end = (start + batch_size - 1).min(latest);
+            self.process_blocks(start, end).await?;
+            start = end + 1;
+        }
+
+        self.update_sync_status().await?;
+        Ok(())
+    }
+
+    async fn verify_chain_tip(&self) -> Result<(), ConsensusError> {
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        // let latest = self.rpc.get_block_number().await
+        //     .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
+
+        // if latest < state.current_block {
+        //     return Err(ConsensusError::SyncError("Chain reorganization detected".into()));
+        // }
+
+        Ok(())
+    }
+
+    pub async fn verify_chain(&self) -> Result<(), ConsensusError> {
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        // Verify from genesis to current
+        self.verify_block_range(0, state.current_block).await?;
+
+        // Verify chain tip
+        self.verify_chain_tip().await?;
+
+        Ok(())
+    }
+
+    pub async fn verify_finality(&self) -> Result<(), ConsensusError> {
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
+
+        // Get latest finalized block
+        let finalized = self
+            .rpc
+            .get_block_by_hash(state.finalized_block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+        // Verify finalized chain
+        self.verify_block_range(0, finalized.header.number).await
+    }
+
+    async fn is_valid_parent(&self, parent_hash: B256) -> Result<bool, ConsensusError> {
+        // Get parent block
+        let parent_number = self
+            .rpc
+            .get_block_by_hash(parent_hash, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(format!("Parent block not found: {}", e)))?
+            .header
+            .number;
+
+        // Get child block (current)
+        let state = self.state.read().unwrap().current_block;
+        let current = self
+            .rpc
+            .get_block_by_number(state, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
+
+        // Verify block number sequence
+        let sequence_valid = (parent_number + 1 != current.header.number) as u8;
+
+        // Verify parent hash matches
+        let hash_valid = (current.header.parent_hash != parent_hash) as u8;
+
+        Ok((sequence_valid & hash_valid) == 1)
+    }
+
+    async fn process_finality_update(&self, update: FinalityUpdate) -> Result<(), ConsensusError> {
+        // Verify sync committee signatures
+        self.verify_sync_committee(&update.sync_aggregate)?;
+
+        // Verify finality proof
+        self.verify_finality_proof(
+            &update.attested_header,
+            &update.finalized_header,
+            &update.finality_branch,
+        );
+
+        // Update finalized head
+        let mut state = self.state.write().unwrap();
+        state.finalized_block = update.finalized_header.parent_hash;
+
+        Ok(())
+    }
+
+    fn verify_sync_committee(&self, sync_aggregate: &SyncAggregate) -> Result<(), ConsensusError> {
+        // Verify that the sync committee signature is valid
+        // This is typically done by:
+        // 1. Checking the sync committee bits are valid
+        // 2. Verifying the aggregate signature against the public keys of participating validators
+
+        let state = self.state.read().unwrap();
+
+        // Check if we have enough participating validators
+        let participation = sync_aggregate.sync_committee_bits;
+
+        if participation < state.min_sync_committee_participants {
+            //IS PANIC VIABLE
+            panic!("insufficient participation")
+        }
+
+        // Here you would typically verify the BLS signature
+        // This is a placeholder - implement actual signature verification
+        if !self.verify_signature(&sync_aggregate.sync_committee_signature) {
+            return Err(ConsensusError::InvalidSignature);
+        }
+
+        Ok(())
+    }
+
+    fn verify_signature(&self, signatures: &Vec<u8>) -> bool {
+        todo!()
+    }
+
+    pub fn verify_finality_proof(
+        &self,
+        attested_header: &BlockHeader,
+        finalized_header: &BlockHeader,
+        finality_branch: &Vec<B256>,
+    ) -> Result<(), ()> {
+        todo!()
+    }
 }
 
 #[async_trait::async_trait]
@@ -115,9 +426,13 @@ impl Concensus for ConsensusImpl {
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-        // if !self.is_valid_parent(block.header.parent_hash).await {
-        //     return Err(ConsensusError::InvalidBlock("Invalid parent hash".into()));
-        // }
+        if !self
+            .is_valid_parent(block.header.parent_hash)
+            .await
+            .expect("boolean: LINE 156")
+        {
+            return Err(ConsensusError::InvalidBlock("Invalid parent hash".into()));
+        }
 
         Ok(())
     }
@@ -138,23 +453,27 @@ impl Concensus for ConsensusImpl {
 
     async fn is_finalized(&self, block: BlockHash) -> bool {
         let state = self.state.read().unwrap();
-        //ISSUE
         block <= state.finalized_block
     }
 
-    async fn get_finalized_head(&self) -> BlockHash {
-        self.state.read().unwrap().finalized_block
+    async fn get_finalized_head(&self) -> Result<BlockHash, ConsensusError> {
+        self.state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))
+            .map(|state| state.finalized_block)
     }
 
-    async fn chain_id(&self) -> u64 {
-        //ISSUE: ERROR HANDLING
-        self.rpc.get_chain_id().await.unwrap().as_u64().unwrap()
-        
+    async fn chain_id(&self) -> Result<u64, ConsensusError> {
+        match self.rpc.get_chain_id().await {
+            Ok(id) => id
+                .as_u64()
+                .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
+            Err(e) => Err(ConsensusError::SyncError(e.to_string())),
+        }
     }
 
     async fn genesis_hash(&self) -> B256 {
-        // Implementation...
-        todo!()
+        self.config.genesis_hash
     }
 
     fn sync_status(&self) -> SyncStatus {

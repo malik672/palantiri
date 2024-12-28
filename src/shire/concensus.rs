@@ -19,6 +19,7 @@ pub struct ConsensusConfig {
 pub struct ConsensusState {
     pub current_block: u64,
     pub finalized_block: BlockHash,
+    pub finalized_block_number: u64,
     pub sync_status: SyncStatus,
     pub min_sync_committee_participants: u64,
 }
@@ -93,6 +94,7 @@ impl ConsensusImpl {
         let state = ConsensusState {
             current_block: config.finalized_block_number,
             finalized_block: config.finalized_block_hash,
+            finalized_block_number: config.finalized_block_number,
             sync_status: SyncStatus::Synced,
             min_sync_committee_participants: config.min_sync_comitee,
         };
@@ -149,6 +151,13 @@ impl ConsensusImpl {
             .map(|state| state.finalized_block)
     }
 
+    pub async fn get_finalized_number(&self) -> Result<u64, ConsensusError> {
+        self.state
+            .read()
+            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))
+            .map(|state| state.finalized_block_number)
+    }
+
     pub async fn chain_id(&self) -> Result<u64, ConsensusError> {
         match self.rpc.get_chain_id().await {
             Ok(id) => id
@@ -192,8 +201,11 @@ impl ConsensusImpl {
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-        if new_block.header.number > state.current_block {
+        let bind = new_block.header.number;
+
+        if bind > state.current_block {
             state.finalized_block = new_head;
+            state.finalized_block_number = bind;
         }
 
         Ok(())

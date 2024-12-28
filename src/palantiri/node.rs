@@ -243,7 +243,7 @@ impl Node {
         }
     }
 
-    async fn track_finality(&self) -> Result<(), NodeError> {
+    pub async fn track_finality(&self) -> Result<(), NodeError> {
         let mut interval = tokio::time::interval(Duration::from_secs(12));
         
         loop {

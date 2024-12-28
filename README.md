@@ -26,3 +26,6 @@ Transaction receipt verification
 Account state verification
 Consensus layer sync
 Validator set management
+
+
+TODO: SINCE THE HASH IS USED MULTIPLE TIMES, WE SHOULD STORE IT INSTEAD OF MAKING CALLS TO THE RPC FOR EACH INSTANCE USAGE

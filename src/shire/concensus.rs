@@ -23,7 +23,7 @@ pub struct ConsensusState {
     pub sync_status: SyncStatus,
     pub min_sync_committee_participants: u64,
 }
-
+#[derive(Debug)]
 pub struct ConsensusImpl {
     pub config: ConsensusConfig,
     state: RwLock<ConsensusState>,
@@ -172,9 +172,7 @@ impl ConsensusImpl {
             .rpc
             .get_block_number()
             .await
-            .map_err(|e| ConsensusError::SyncError(e.to_string()))?
-            .as_u64()
-            .unwrap_or(panic!());
+            .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
 
         let mut state = self.state.write().unwrap();
 
@@ -268,9 +266,7 @@ impl ConsensusImpl {
             .rpc
             .get_block_number()
             .await
-            .map_err(|e| ConsensusError::SyncError(e.to_string()))?
-            .as_u64()
-            .ok_or_else(|| ConsensusError::SyncError("Invalid block number".into()))?;
+            .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
 
         let state = self
             .state

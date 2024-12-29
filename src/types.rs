@@ -25,7 +25,7 @@ pub struct BlockHeader {
     pub base_fee_per_gas: Option<U256>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<Transaction>,

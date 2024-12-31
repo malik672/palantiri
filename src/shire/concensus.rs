@@ -114,7 +114,7 @@ impl ConsensusImpl {
                 .await
                 .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            if !self.is_valid_parent(block.header.parent_hash).await? {
+            if !self.is_valid_parent(block.parent_hash).await? {
                 return Err(ConsensusError::InvalidBlock(
                     "Invalid block sequence".into(),
                 ));
@@ -237,7 +237,7 @@ impl ConsensusImpl {
                 .await
                 .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            self.process_new_block(block.header.parent_hash).await?;
+            self.process_new_block(block.parent_hash).await?;
         }
         Ok(())
     }
@@ -358,10 +358,10 @@ impl ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         // Verify block number sequence
-        let sequence_valid = (parent_number + 1 != current.header.number) as u8;
+        let sequence_valid = (parent_number + 1 != current.number) as u8;
 
         // Verify parent hash matches
-        let hash_valid = (current.header.parent_hash != parent_hash) as u8;
+        let hash_valid = (current.parent_hash != parent_hash) as u8;
 
         Ok((sequence_valid & hash_valid) == 1)
     }

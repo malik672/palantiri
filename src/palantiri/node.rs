@@ -1,5 +1,6 @@
 use crate::{palantiri::rpc::RpcClient, shire::concensus::ConsensusImpl, types::BlockHeader};
 use alloy::primitives::BlockHash;
+use log::info;
 use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_LOCALITY3, _PREFETCH_READ};
 use std::sync::Arc;
 use thiserror::Error;
@@ -95,7 +96,7 @@ impl Node {
         // Check if reorg needed
         if new_block.number <= state.current_block {
             // Get parent blocks until common ancestor found
-            let mut old_chain = current_block.header;
+            let mut old_chain = current_block;
             let hash = new_block.parent_hash;
             let mut new_chain = new_block;
 
@@ -206,7 +207,7 @@ impl Node {
 
                 // Verify block header
                 self.consensus
-                    .verify_block(block.header.parent_hash)
+                    .verify_block(block.parent_hash)
                     .await
                     .map_err(|e| NodeError::Sync(e.to_string()))?;
 
@@ -226,8 +227,7 @@ impl Node {
     }
 
     pub async fn watch_new_blocks(&self) -> Result<(), NodeError> {
-        let mut interval = tokio::time::interval(Duration::from_secs(13));
-
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
         // Get latest block number
         let mut latest = self
             .rpc
@@ -235,16 +235,25 @@ impl Node {
             .await
             .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
+        info!("Starting block watcher with latest block: {}", latest);
+
+        // Get current state
+        let mut state = self
+            .SyncedState
+            .as_ref()
+            .ok_or(NodeError::State("Not synced".into()))?
+            .write()
+            .await;
+
         loop {
             interval.tick().await;
 
-            // Get current state
-            let mut state = self
-                .SyncedState
-                .as_ref()
-                .ok_or(NodeError::State("Not synced".into()))?
-                .write()
-                .await;
+            // Get latest block from chain
+            let chain_head = self
+                .rpc
+                .get_block_number()
+                .await
+                .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
             let current = state.current_block;
 
@@ -256,16 +265,17 @@ impl Node {
             // }
 
             // Process new blocks if any
-            if latest > current {
-                let block = self
-                    .rpc
-                    .get_block_by_number(latest, false)
-                    .await
-                    .map_err(|e| NodeError::Rpc(e.to_string()))?;
+            if chain_head > current {
+                info!("Processing block {} {} {}", current, latest, chain_head);
 
-                // self.handle_reorg(block.header).await?;
-                state.current_block = latest;
-                latest += 1
+                // let block = self.rpc.get_block_by_number(latest, false)
+                //     .await
+                //     .map_err(|e| NodeError::Rpc(e.to_string()))?;
+
+                // self.handle_reorg(block).await?;
+                state.current_block = chain_head;
+
+                info!("Updated chain head {}", chain_head);
             }
         }
     }
@@ -366,6 +376,19 @@ mod tests {
         }
     }
 
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    fn setup_logging() {
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                EnvFilter::from_default_env()
+                    .add_directive(tracing::Level::INFO.into())
+                    .add_directive("light_client=debug".parse().unwrap()),
+            )
+            .with_test_writer()
+            .init();
+    }
+
     #[tokio::test]
     async fn test_rpc_client() {
         let rpc = RpcClient::new(
@@ -400,16 +423,21 @@ mod tests {
         assert!(!node.SyncedState.is_none());
         let binding = node.SyncedState.unwrap();
         let _node = binding.read().await;
-        assert!(_node.current_block > 0); 
+        assert!(_node.current_block > 0);
 
         //At this point, the node is already synced but it's not finalized yet
         assert!(_node.finalized_block == 0);
     }
 
     #[tokio::test]
-    async fn test_wwatch_new_blocks() {
+    async fn test_watch_new_blocks() {
+        setup_logging();
+
         let rpc = RpcClient::new(
-            TransportBuilder::new("https://mainnet.infura.io/v3/de690e56c52741b5a18be8c49c2f2b01".to_string()).build_http(),
+            TransportBuilder::new(
+                "https://mainnet.infura.io/v3/de690e56c52741b5a18be8c49c2f2b01".to_string(),
+            )
+            .build_http(),
         );
         let mut node = Node::new(
             Arc::new(ConsensusImpl::new(
@@ -425,7 +453,6 @@ mod tests {
             )),
             Arc::new(rpc),
         );
-
         let a = node.watch_new_blocks().await.unwrap();
     }
 }

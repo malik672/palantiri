@@ -12,7 +12,7 @@ use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use std::{fmt::Display, net::SocketAddr, sync::Arc};
 
-use crate::types::Block;
+use crate::types::{Block, BlockHeader};
 
 use super::*;
 
@@ -161,7 +161,7 @@ impl RpcClient {
         Ok(block_number)
     }
 
-    pub async fn get_block_by_number(&self, number: u64, full_tx: bool) -> Result<Block, RpcError> {
+    pub async fn get_block_by_number(&self, number: u64, full_tx: bool) -> Result<BlockHeader, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -169,10 +169,11 @@ impl RpcClient {
             id: 1,
         };
 
-        let a: Value = self.execute_with_cache(request).await?;
-        let block: Value = serde_json::from_value(a).unwrap();
-        println!("{:?}", block);
-        Ok((Block{ header: todo!(), transactions: todo!(), uncles: todo!() }))
+        let response: Value = self.execute_with_cache(request).await?;
+        let block: BlockHeader =
+            serde_json::from_value(response["result"].clone()).map_err(|e| RpcError::Response(e.to_string()))?;
+
+        Ok(block)
     }
 
     pub async fn get_block_by_hash(
@@ -187,8 +188,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let a: Value = self.execute_with_cache(request).await?;
-        println!("{:?}", a);
+        let response: Value = self.execute_with_cache(request).await?;
         Ok((Block::default()))
     }
 

@@ -1,6 +1,7 @@
 use crate::{palantiri::rpc::RpcClient, shire::concensus::ConsensusImpl, types::BlockHeader};
 use alloy::primitives::BlockHash;
 use log::info;
+use mordor::SlotSynchronizer;
 use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_LOCALITY3, _PREFETCH_READ};
 use std::sync::Arc;
 use thiserror::Error;
@@ -70,7 +71,7 @@ impl Node {
         self.initialize().await?;
 
         // Start sync pipeline
-        self.sync_block().await?;
+        self.watch_new_blocks().await?;
 
         Ok(())
     }
@@ -149,6 +150,9 @@ impl Node {
         Ok(())
     }
 
+    /// By Design this function will only be called when we initialy start the node and never get's called again
+    /// So basically just sync the blocks from the genesis block to the latest block
+    /// After this initial sync completes, block updates are handled by watch_new_blocks().
     pub async fn sync_blocks(&mut self) -> Result<(), NodeError> {
         let mut state = self
             .SyncedState
@@ -167,7 +171,7 @@ impl Node {
         while state.current_block < latest {
             // Sync batch of blocks
             let start = state.current_block + 1;
-            let end = (start + 100).min(latest);
+            let end = (start + 10_000).min(latest);
 
             self.sync_block_range(start, end).await?;
 
@@ -176,58 +180,55 @@ impl Node {
         Ok(())
     }
 
-    pub async fn sync_block(&mut self) -> Result<(), NodeError> {
+    async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
         let mut state = self
             .SyncedState
             .as_ref()
             .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
             .write()
             .await;
-        self.NotSyncedState = None;
+        for number in start..=end {
+            let block = self
+                .rpc
+                .get_block_by_number(number, false)
+                .await
+                .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
-        let latest = self
-            .rpc
-            .get_block_number()
-            .await
-            .map_err(|e| NodeError::Rpc(e.to_string()))?;
+            // Verify block header
+            // self.consensus
+            //     .verify_block(block.parent_hash)
+            //     .await
+            //     .map_err(|e| NodeError::Sync(e.to_string()))?;
 
-        state.current_block = latest;
-
-        Ok(())
-    }
-
-    async fn sync_block_range(&self, mut start: u64, end: u64) -> Result<(), NodeError> {
-        while start <= end {
-            for number in start..=end {
-                let block = self
-                    .rpc
-                    .get_block_by_number(number, false)
-                    .await
-                    .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-                // Verify block header
-                self.consensus
-                    .verify_block(block.parent_hash)
-                    .await
-                    .map_err(|e| NodeError::Sync(e.to_string()))?;
-
-                // Update state
-                let mut state = self
-                    .SyncedState
-                    .as_ref()
-                    .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
-                    .write()
-                    .await;
-                state.current_block = number;
-            }
-
-            start += 1;
+            // Update state
+            state.current_block = number;
         }
         Ok(())
     }
 
+    /// Watches for new blocks by synchronizing with Ethereum slot timings.
+    ///
+    /// This function implements an optimistic block tracking strategy to minimize RPC calls
+    /// while maintaining accurate chain head tracking. It uses the mathematical relationship  
+    /// between slot numbers and block numbers (difference of 10,787,064) for validation.
+    ///
+    /// - Minimal RPC calls
+    ///
+    /// # Arguments
+    /// - &self: Reference to Node instance
+    ///
+    /// # Returns
+    /// - Result<(), NodeError>: Ok(()) on success, NodeError on failure
+    ///
+    /// # Example
+    /// ```no_run
+    /// let node = Node::new(consensus, rpc);
+    /// node.watch_new_blocks().await?;
+    /// ```
     pub async fn watch_new_blocks(&self) -> Result<(), NodeError> {
-        let mut interval = tokio::time::interval(Duration::from_secs(2));
+        let time = SlotSynchronizer::default();
+        const BLOCK_SLOT_DIFFERENCE: u64 = 10_787_064;
+
         // Get latest block number
         let mut latest = self
             .rpc
@@ -246,14 +247,12 @@ impl Node {
             .await;
 
         loop {
-            interval.tick().await;
+            // Get current slot info
+            let (slot, _elapsed, remaining) = time.slot_info().unwrap();
 
-            // Get latest block from chain
-            let chain_head = self
-                .rpc
-                .get_block_number()
-                .await
-                .map_err(|e| NodeError::Rpc(e.to_string()))?;
+            // Use remaining time to determine next check
+            let wait_time = Duration::from_secs(remaining as u64);
+            tokio::time::sleep(wait_time).await;
 
             let current = state.current_block;
 
@@ -265,17 +264,29 @@ impl Node {
             // }
 
             // Process new blocks if any
-            if chain_head > current {
-                info!("Processing block {} {} {}", current, latest, chain_head);
+            if latest > current {
+                info!("Processing block {} {}", current, latest);
 
                 // let block = self.rpc.get_block_by_number(latest, false)
                 //     .await
                 //     .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
                 // self.handle_reorg(block).await?;
-                state.current_block = chain_head;
 
-                info!("Updated chain head {}", chain_head);
+                if (latest - slot) == BLOCK_SLOT_DIFFERENCE {
+                    state.current_block = latest;
+                } else {
+                    latest = self
+                        .rpc
+                        .get_block_number()
+                        .await
+                        .map_err(|e| NodeError::Rpc(e.to_string()))?;
+
+                    state.current_block = latest;
+                }
+
+                info!("Updated chain head {}", latest);
+                latest += 1;
             }
         }
     }
@@ -431,6 +442,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_watch_new_blocks() {
+        let rpc = RpcClient::new(
+            TransportBuilder::new(
+                "https://mainnet.infura.io/v3/de690e56c52741b5a18be8c49c2f2b01".to_string(),
+            )
+            .build_http(),
+        );
+        let node = Node::new(
+            Arc::new(ConsensusImpl::new(
+                ConsensusConfig {
+                    chain_id: 1,
+                    finalized_block_number: 0,
+                    genesis_hash: B256::default(),
+                    finalized_block_hash: B256::default(),
+                    sync_period: 10,
+                    min_sync_comitee: 30,
+                },
+                Arc::new(rpc.clone()),
+            )),
+            Arc::new(rpc),
+        );
+
+        // the watch new blocks checks for new blocks
+        let _a = node.watch_new_blocks().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn sync_blocks() {
         setup_logging();
 
         let rpc = RpcClient::new(
@@ -453,6 +491,12 @@ mod tests {
             )),
             Arc::new(rpc),
         );
-        let a = node.watch_new_blocks().await.unwrap();
+
+        let _a = node.sync_blocks().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn handle_reorgs() {
+        todo!()
     }
 }

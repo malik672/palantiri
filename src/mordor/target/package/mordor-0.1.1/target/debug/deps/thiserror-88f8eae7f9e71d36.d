@@ -1,0 +1,9 @@
+/Users/malik/Desktop/n-work/light-client/src/mordor/target/debug/deps/libthiserror-88f8eae7f9e71d36.rmeta: /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/aserror.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/display.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/provide.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/var.rs
+
+/Users/malik/Desktop/n-work/light-client/src/mordor/target/debug/deps/thiserror-88f8eae7f9e71d36.d: /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/aserror.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/display.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/provide.rs /Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/var.rs
+
+/Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/lib.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/aserror.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/display.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/provide.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-2.0.9/src/var.rs:

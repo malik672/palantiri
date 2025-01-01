@@ -1,6 +1,6 @@
 [package]
 name = "mordor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Ethereum  Chain slot synchronization"
 license = "MIT"

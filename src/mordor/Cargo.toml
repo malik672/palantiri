@@ -2,7 +2,12 @@
 name = "mordor"
 version = "0.1.0"
 edition = "2021"
-
+description = "Ethereum  Chain slot synchronization"
+license = "MIT"
+authors = ["Malik"]
+documentation = "https://docs.rs/mordor"
+readme = "README.md"
+repository = "https://github.com/malik672/Palantir/tree/master/src/mordor"
 [dependencies]
 chrono = "0.4.39"
 thiserror = "2.0.9"

@@ -1,8 +1,10 @@
-use crate::{palantiri::rpc::RpcClient, shire::concensus::ConsensusImpl, types::BlockHeader};
-use alloy::primitives::BlockHash;
+use crate::{
+    palantiri::rpc::RpcClient,
+    shire::concensus::ConsensusImpl,
+    types::{BlockHeader, NUM_HASH_DATA},
+};
 use log::info;
 use mordor::SlotSynchronizer;
-use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_LOCALITY3, _PREFETCH_READ};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{broadcast, RwLock};
@@ -29,14 +31,6 @@ pub enum NodeError {
 pub struct SyncedNodeState {
     current_block: u64,
     finalized_block: u64,
-    peers: Vec<String>,
-}
-
-#[derive(Debug)]
-pub struct NotSyncedNodeState {
-    current_block: u64,
-    finalized_block: u64,
-    peers: Vec<String>,
 }
 
 #[allow(non_snake_case)]
@@ -45,7 +39,6 @@ pub struct Node {
     consensus: Arc<ConsensusImpl>,
     rpc: Arc<RpcClient>,
     SyncedState: Option<RwLock<SyncedNodeState>>,
-    NotSyncedState: Option<RwLock<NotSyncedNodeState>>,
     event_tx: broadcast::Sender<ChainEvent>,
 }
 
@@ -59,9 +52,7 @@ impl Node {
             SyncedState: Some(RwLock::new(SyncedNodeState {
                 current_block: 0,
                 finalized_block: 0,
-                peers: Vec::new(),
             })),
-            NotSyncedState: None,
             event_tx,
         }
     }
@@ -80,62 +71,6 @@ impl Node {
         self.event_tx.subscribe()
     }
 
-    async fn handle_reorg(&self, new_block: BlockHeader) -> Result<(), NodeError> {
-        let state = self
-            .SyncedState
-            .as_ref()
-            .ok_or(NodeError::State("Not in synced state".into()))?
-            .read()
-            .await;
-
-        let current_block = self
-            .rpc
-            .get_block_by_number(state.current_block, false)
-            .await
-            .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-        // Check if reorg needed
-        if new_block.number <= state.current_block {
-            // Get parent blocks until common ancestor found
-            let mut old_chain = current_block;
-            let hash = new_block.parent_hash;
-            let mut new_chain = new_block;
-
-            while old_chain.parent_hash != new_chain.parent_hash {
-                old_chain = self
-                    .rpc
-                    .get_block_by_hash(old_chain.parent_hash, false)
-                    .await
-                    .map_err(|e| NodeError::Rpc(e.to_string()))?
-                    .header;
-
-                new_chain = self
-                    .rpc
-                    .get_block_by_hash(new_chain.parent_hash, false)
-                    .await
-                    .map_err(|e| NodeError::Rpc(e.to_string()))?
-                    .header;
-            }
-
-            // Get common ancestor
-            let ancestor = self
-                .rpc
-                .get_block_by_hash(old_chain.parent_hash, false)
-                .await
-                .map_err(|e| NodeError::Rpc(e.to_string()))?
-                .header;
-
-            // Emit reorg event
-            self.event_tx
-                .send(ChainEvent::Reorg {
-                    old_tip: old_chain.number,
-                    common_ancestor: ancestor.number,
-                })
-                .map_err(|e| NodeError::State(e.to_string()))?;
-        }
-
-        Ok(())
-    }
 
     async fn initialize(&self) -> Result<(), NodeError> {
         let mut state = self
@@ -154,13 +89,12 @@ impl Node {
     /// So basically just sync the blocks from the genesis block to the latest block
     /// After this initial sync completes, block updates are handled by watch_new_blocks().
     pub async fn sync_blocks(&mut self) -> Result<(), NodeError> {
-        let mut state = self
+        let state = self
             .SyncedState
             .as_ref()
             .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
-            .write()
+            .read()
             .await;
-        self.NotSyncedState = None;
 
         let latest = self
             .rpc
@@ -168,14 +102,11 @@ impl Node {
             .await
             .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
-        while state.current_block < latest {
+        let start = state.current_block;
+
+        if start < latest {
             // Sync batch of blocks
-            let start = state.current_block + 1;
-            let end = (start + 10_000).min(latest);
-
-            self.sync_block_range(start, end).await?;
-
-            state.current_block = end;
+            self.sync_block_range(start, latest).await?;
         }
         Ok(())
     }
@@ -187,22 +118,20 @@ impl Node {
             .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
             .write()
             .await;
-        for number in start..=end {
+
+        let mut _start = start;
+        while _start < end {
             let block = self
                 .rpc
-                .get_block_by_number(number, false)
+                .get_block_by_number(_start, false)
                 .await
                 .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
             // Verify block header
-            // self.consensus
-            //     .verify_block(block.parent_hash)
-            //     .await
-            //     .map_err(|e| NodeError::Sync(e.to_string()))?;
-
-            // Update state
-            state.current_block = number;
+            //todo()!
+            _start += 1;
         }
+        state.current_block = end;
         Ok(())
     }
 
@@ -227,7 +156,7 @@ impl Node {
     /// ```
     pub async fn watch_new_blocks(&self) -> Result<(), NodeError> {
         let time = SlotSynchronizer::default();
-        const BLOCK_SLOT_DIFFERENCE: u64 = 10_787_064;
+        let mut block_slot_difference: u64 = 10787043;
 
         // Get latest block number
         let mut latest = self
@@ -256,24 +185,18 @@ impl Node {
 
             let current = state.current_block;
 
-            // // Prefetch the current block into the L1 cache
-            // let current_ptr: *const u64 = &current as *const _;
+            // let block = self
+            //     .rpc
+            //     .get_block_by_number(current, false)
+            //     .await
+            //     .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
-            // unsafe {
-            //     _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>(current_ptr.cast());
-            // }
-
+            // self.handle_reorg(block).await.map_err(|e| NodeError::Rpc(e.to_string()))?;
             // Process new blocks if any
             if latest > current {
                 info!("Processing block {} {}", current, latest);
 
-                // let block = self.rpc.get_block_by_number(latest, false)
-                //     .await
-                //     .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-                // self.handle_reorg(block).await?;
-
-                if (latest - slot) == BLOCK_SLOT_DIFFERENCE {
+                if (latest - slot) == block_slot_difference {
                     state.current_block = latest;
                 } else {
                     latest = self
@@ -281,10 +204,10 @@ impl Node {
                         .get_block_number()
                         .await
                         .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
                     state.current_block = latest;
+                    block_slot_difference = latest - slot;
+                    println!("Latest block: {}", latest);
                 }
-
                 info!("Updated chain head {}", latest);
                 latest += 1;
             }
@@ -333,13 +256,11 @@ mod tests {
     use crate::types::Block;
 
     use super::*;
-    use alloy::primitives::{B256, U256};
+    use alloy::primitives::{BlockHash, B256, U256};
     use async_trait::async_trait;
     use mockall::predicate::*;
     use mockall::*;
     use serde_json::json;
-    use tokio::sync::watch;
-    use tokio_test::block_on;
 
     #[automock]
     #[async_trait]
@@ -442,9 +363,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_watch_new_blocks() {
+
+        setup_logging();
         let rpc = RpcClient::new(
             TransportBuilder::new(
-                "https://mainnet.infura.io/v3/de690e56c52741b5a18be8c49c2f2b01".to_string(),
+                "https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string(),
             )
             .build_http(),
         );
@@ -493,10 +416,5 @@ mod tests {
         );
 
         let _a = node.sync_blocks().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn handle_reorgs() {
-        todo!()
     }
 }

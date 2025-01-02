@@ -147,7 +147,7 @@ impl RpcClient {
         };
 
         // Send the RPC request
-        let response: Value = self.execute_with_cache(request).await?;
+        let response: Value = self.execute(request).await?;
 
         // Extract result
         let hex_str = response["result"]
@@ -308,6 +308,21 @@ impl RpcClient {
         if let Ok(mut cache) = self.cache.write() {
             cache.insert(key, response.clone());
         }
+
+        serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
+    }
+
+    pub async fn execute<T: DeserializeOwned>(
+        &self,
+        request: RpcRequest,
+    ) -> Result<T, RpcError> {
+
+        // Execute request if cache miss
+        let response = self
+            .transport
+            .execute(serde_json::to_string(&request).expect("convert to string"))
+            .await?;
+
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
     }

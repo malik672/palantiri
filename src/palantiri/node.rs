@@ -169,13 +169,6 @@ impl Node {
 
             let current = state.current_block;
 
-            // let block = self
-            //     .rpc
-            //     .get_block_by_number(current, false)
-            //     .await
-            //     .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-            // self.handle_reorg(block).await.map_err(|e| NodeError::Rpc(e.to_string()))?;
             // Process new blocks if any
             if latest > current {
                 info!("Processing block {} {}", current, latest);
@@ -257,10 +250,10 @@ mod tests {
     #[tokio::test]
     async fn test_rpc_client() {
         let rpc = RpcClient::new(
-            TransportBuilder::new("https://sepolia.base.org".to_string()).build_http(),
+            TransportBuilder::new("https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string()).build_http(),
         );
-        let mock = rpc.get_block_by_number(64, true).await.unwrap();
-        println!("{:?}", mock);
+        let mock = rpc.get_block_by_number(215466241, false).await.map_err(|e| NodeError::Rpc(e.to_string())).unwrap();
+        println!("{:?}", mock.sync_aggregate);
     }
 
     #[tokio::test]

@@ -161,7 +161,11 @@ impl RpcClient {
         Ok(block_number)
     }
 
-    pub async fn get_block_by_number(&self, number: u64, full_tx: bool) -> Result<BlockHeader, RpcError> {
+    pub async fn get_block_by_number(
+        &self,
+        number: u64,
+        full_tx: bool,
+    ) -> Result<BlockHeader, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -169,9 +173,12 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute_with_cache(request).await?;
-        let block: BlockHeader =
-            serde_json::from_value(response["result"].clone()).map_err(|e| RpcError::Response(e.to_string()))?;
+        let response: Value = self.execute(request).await?;
+        println!("{:?}", json!([format!("0x{:x}", number), full_tx]));
+
+        //ISSUE: Perf
+        let block: BlockHeader = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
 
         Ok(block)
     }
@@ -180,16 +187,19 @@ impl RpcClient {
         &self,
         hash: FixedBytes<32>,
         full_tx: bool,
-    ) -> Result<Block, RpcError> {
+    ) -> Result<BlockHeader, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
-            method: "eth_getBlockByNumber",
+            method: "eth_getBlockByHash",
             params: json!([format!("0x{:x}", hash), full_tx]),
             id: 1,
         };
 
-        let response: Value = self.execute_with_cache(request).await?;
-        Ok((Block::default()))
+        let response: Value = self.execute(request).await?;
+        //ISSUE: Perf
+        let block: BlockHeader = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
+        Ok(block)
     }
 
     pub async fn get_balance(
@@ -312,17 +322,12 @@ impl RpcClient {
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
     }
 
-    pub async fn execute<T: DeserializeOwned>(
-        &self,
-        request: RpcRequest,
-    ) -> Result<T, RpcError> {
-
+    pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
         // Execute request if cache miss
         let response = self
             .transport
             .execute(serde_json::to_string(&request).expect("convert to string"))
             .await?;
-
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
     }

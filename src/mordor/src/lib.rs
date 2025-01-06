@@ -5,6 +5,10 @@ use std::time::Duration;
 pub const DEFAULT_GENESIS_TIMESTAMP: i64 = 1606824023;
 /// Duration of each slot in seconds
 pub const SLOT_DURATION: u64 = 12;
+/// Number of slots in an epoch
+pub const SLOTS_PER_EPOCH: u64 = 32;
+/// Duration of each epoch in seconds
+pub const EPOCH_DURATION: u64 = SLOT_DURATION * SLOTS_PER_EPOCH;
 
 pub type SlotTiming = (u64, u8, u8);
 
@@ -46,6 +50,18 @@ impl SlotSynchronizer {
         
 
         Ok(duration_since_genesis as u64 / SLOT_DURATION)
+    }
+
+    pub fn current_epoch(&self) -> Result<u64, ()> {
+        Ok(self.current_slot().unwrap() / SLOTS_PER_EPOCH)
+    }
+
+    pub fn slot_to_epoch(&self, slot: u64) -> u64 {
+        slot / SLOTS_PER_EPOCH
+    }
+
+    pub fn epoch_start_slot(&self, epoch: u64) -> u64 {
+        epoch * SLOTS_PER_EPOCH
     }
 
     ///Calulates the nearest slot to the current time

@@ -1,13 +1,14 @@
+use bls12_381::{G1Projective, G2Prepared};
+
 pub mod concensus;
 
-// Single cache-line optimized fork bitmap ||  5 bits per fork || 
-const FORK_BITS: u32 = 0b11111; 
-const FORK: u32 = 
-    0b00001 |           // Genesis   (bits 0-4)
+// Single cache-line optimized fork bitmap ||  5 bits per fork ||
+const FORK_BITS: u32 = 0b11111;
+const FORK: u32 = 0b00001 |           // Genesis   (bits 0-4)
     0b00010 << 5  |     // Altair    (bits 5-9)
     0b00100 << 10 |     // Bellatrix (bits 10-14) 
     0b01000 << 15 |     // Capella   (bits 15-19)
-    0b10000 << 20;      // Deneb     (bits 20-24)
+    0b10000 << 20; // Deneb     (bits 20-24)
 
 
 #[derive(Debug, Clone, Copy)]
@@ -42,18 +43,4 @@ impl Forks {
     pub fn is_deneb(&self) -> bool {
         self.0 & (FORK_BITS << 20) != 0
     }
-
-}
-
-
-mod tests {
-    use super::*;
-    #[test]
-   fn test_use_case() {
-       let a = Forks::new();
-       let c = a.with_forks(20);
-
-      let b =  a.is_genesis();
-      println!("{:?}{:?}{:?}", b, a, c);
-   }
 }

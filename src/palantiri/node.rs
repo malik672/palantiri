@@ -58,9 +58,6 @@ impl Node {
     }
 
     pub async fn start(&mut self) -> Result<(), NodeError> {
-        // Initialize state
-        self.initialize().await?;
-
         // Start sync pipeline
         self.watch_new_blocks().await?;
 
@@ -71,19 +68,6 @@ impl Node {
         self.event_tx.subscribe()
     }
 
-
-    async fn initialize(&self) -> Result<(), NodeError> {
-        let mut state = self
-            .SyncedState
-            .as_ref()
-            .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
-            .write()
-            .await;
-        state.current_block = 0;
-        state.finalized_block = 0;
-
-        Ok(())
-    }
 
     /// By Design this function will only be called when we initialy start the node and never get's called again
     /// So basically just sync the blocks from the genesis block to the latest block
@@ -128,7 +112,7 @@ impl Node {
                 .map_err(|e| NodeError::Rpc(e.to_string()))?;
 
             // Verify block header
-            //todo()!
+            todo!();
             _start += 1;
         }
         state.current_block = end;
@@ -249,66 +233,15 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use crate::palantiri::rpc::{RpcRequest, Transport};
+
     use crate::palantiri::transport::http::TransportBuilder;
-    use crate::palantiri::RpcError;
-    use crate::shire::concensus::{ConsensusConfig, ConsensusState};
-    use crate::types::Block;
+    use crate::shire::concensus::ConsensusConfig;
 
     use super::*;
-    use alloy::primitives::{BlockHash, B256, U256};
-    use async_trait::async_trait;
-    use mockall::predicate::*;
-    use mockall::*;
-    use serde_json::json;
+    use alloy::primitives::B256;
+   
 
-    #[automock]
-    #[async_trait]
-    pub trait RpcClientTrait {
-        async fn get_block_by_number(&self, number: u64, full: bool) -> Result<Block, RpcError>;
-        async fn get_block_by_hash(&self, hash: BlockHash, full: bool) -> Result<Block, RpcError>;
-        async fn get_block_number(&self) -> Result<U256, RpcError>;
-    }
-
-    #[async_trait]
-    impl RpcClientTrait for RpcClient {
-        async fn get_block_by_number(&self, number: u64, full: bool) -> Result<Block, RpcError> {
-            let request = RpcRequest {
-                jsonrpc: "2.0",
-                method: "eth_getBlockByNumber",
-                params: json!([format!("0x{:x}", number), full]),
-                id: 1,
-            };
-
-            self.execute_with_cache(request).await
-        }
-
-        async fn get_block_by_hash(&self, hash: BlockHash, full: bool) -> Result<Block, RpcError> {
-            let request = RpcRequest {
-                jsonrpc: "2.0",
-                method: "eth_getBlockByNumber",
-                params: json!([format!("0x{:x}", hash), full]),
-                id: 1,
-            };
-
-            self.execute_with_cache(request).await
-        }
-
-        async fn get_block_number(&self) -> Result<U256, RpcError> {
-            let number = 64;
-            let full_tx = true;
-            let request = RpcRequest {
-                jsonrpc: "2.0",
-                method: "eth_getBlockByNumber",
-                params: json!([format!("0x{:x}", number), full_tx]),
-                id: 1,
-            };
-
-            self.execute_with_cache(request).await
-        }
-    }
-
-    use tracing_subscriber::{fmt, EnvFilter};
+    use tracing_subscriber:: EnvFilter;
 
     fn setup_logging() {
         tracing_subscriber::fmt()

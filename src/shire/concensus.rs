@@ -37,6 +37,13 @@ pub struct SyncAggregate {
 }
 
 #[derive(Debug)]
+pub struct SyncCommittee {
+    pub period: u64,
+    // pub pubkeys: Vec<PublicKey>,  
+    // pub aggregate_pubkey: PublicKey,
+}
+
+#[derive(Debug)]
 pub struct FinalityUpdate {
     pub attested_header: BlockHeader,
     pub finalized_header: BlockHeader,
@@ -261,35 +268,6 @@ impl ConsensusImpl {
         todo!()
     }
 
-    pub async fn sync_blocks(&self) -> Result<(), ConsensusError> {
-        let latest = self
-            .rpc
-            .get_block_number()
-            .await
-            .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
-
-        let state = self
-            .state
-            .read()
-            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
-
-        if latest <= state.current_block {
-            return Ok(());
-        }
-
-        // Process blocks in batches
-        let batch_size = 100;
-        let mut start = state.current_block + 1;
-
-        while start <= latest {
-            let end = (start + batch_size - 1).min(latest);
-            self.process_blocks(start, end).await?;
-            start = end + 1;
-        }
-
-        self.update_sync_status().await?;
-        Ok(())
-    }
 
     async fn verify_chain_tip(&self) -> Result<(), ConsensusError> {
         let state = self
@@ -357,13 +335,7 @@ impl ConsensusImpl {
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-        // Verify block number sequence
-        let sequence_valid = (parent_number + 1 != current.number) as u8;
-
-        // Verify parent hash matches
-        let hash_valid = (current.parent_hash != parent_hash) as u8;
-
-        Ok((sequence_valid & hash_valid) == 1)
+            Ok(parent_number + 1 == current.number && current.parent_hash == parent_hash)
     }
 
     async fn process_finality_update(&self, update: FinalityUpdate) -> Result<(), ConsensusError> {
@@ -439,6 +411,10 @@ impl ConsensusImpl {
         }
 
         Ok(())
+    }
+
+    pub async fn verify_header(&self, header: BlockHeader) -> Result<(), ConsensusError> {
+          todo!()
     }
 
 }

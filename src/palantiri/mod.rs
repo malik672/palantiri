@@ -7,6 +7,7 @@ pub mod cache;
 pub mod rpc;
 pub mod transport;
 pub mod node;
+pub mod libp2p;
 
 #[derive(Debug)]
 pub struct HttpTransport {

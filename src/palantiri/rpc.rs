@@ -2,17 +2,15 @@ use alloy::hex;
 use alloy::primitives::{keccak256, Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
 use lru::LruCache;
-use reqwest::Client;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
-use std::error::Error;
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use std::{fmt::Display, net::SocketAddr, sync::Arc};
+use std:: sync::Arc;
 
-use crate::types::{Block, BlockHeader};
+use crate::types::BlockHeader;
 
 use super::*;
 
@@ -161,11 +159,11 @@ impl RpcClient {
         Ok(block_number)
     }
 
-    pub async fn get_block_by_number(
+    pub async fn get_block_header_by_number(
         &self,
         number: u64,
         full_tx: bool,
-    ) -> Result<BlockHeader, RpcError> {
+    ) -> Result<Option<BlockHeader>, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -174,20 +172,24 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-        println!("{:?}", json!([format!("0x{:x}", number), full_tx]));
+    
 
-        //ISSUE: Perf
+        if response["result"].is_null() {
+            return Ok(None);
+        }
+
+        //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
 
-        Ok(block)
+        Ok(Some(block))
     }
 
     pub async fn get_block_by_hash(
         &self,
         hash: FixedBytes<32>,
         full_tx: bool,
-    ) -> Result<BlockHeader, RpcError> {
+    ) -> Result<Option<BlockHeader>, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByHash",
@@ -196,10 +198,11 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-        //ISSUE: Perf
+      
+        // PERFORMANCE IMPROVEMENT: Avoid cloning the response
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
-        Ok(block)
+        Ok(Some(block))
     }
 
     pub async fn get_balance(
@@ -323,7 +326,6 @@ impl RpcClient {
     }
 
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
-        // Execute request if cache miss
         let response = self
             .transport
             .execute(serde_json::to_string(&request).expect("convert to string"))

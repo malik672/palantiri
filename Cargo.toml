@@ -1,24 +1,29 @@
 [package]
-name = "palantír"
+name = "palantir"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 alloy = { version = "0.8.3", features = ["network", "rpc"] }
+alloy-primitives = "0.8.18"
 async-trait = "0.1.83"
 bls-signatures = "0.15.0"
 bls12_381 = { version = "0.8.0", features = ["experimental"] }
+criterion = "0.5.1"
 eyre = "0.6.12"
+futures = "0.3.31"
 libp2p = {version = "0.54.1", features = ["gossipsub"]}
 log = "0.4.22"
 lru = "0.12.5"
 mockall = "0.13.1"
 mordor = "0.1.1"
+rand = "0.8.5"
 reqwest = "0.12.9"
 serde = { version = "1.0.216", features = ["derive"] }
 
 serde_json = "1.0.133"
 ssz-derive = "0.2.0"
+tempfile = "3.15.0"
 thiserror = "2.0.9"
 tokio = "1.42.0"
 tokio-test = "0.4.4"
@@ -28,3 +33,7 @@ tree_hash_derive = "0.9.0"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full", "test-util", "macros", "rt"] }
+
+[[bench]]
+name = "rpc"
+harness = false

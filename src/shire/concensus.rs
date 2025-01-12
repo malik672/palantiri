@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use alloy::primitives::{Address, BlockHash, B256, U256};
-use reqwest::header;
+
 
 use crate::{palantiri::rpc::RpcClient, types::BlockHeader};
 
@@ -138,7 +138,7 @@ impl ConsensusImpl {
             .rpc
             .get_block_by_hash(block, false)
             .await
-            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?.unwrap()
             .number;
      
         //ISSUE
@@ -200,7 +200,7 @@ impl ConsensusImpl {
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-        let bind = new_block.number;
+        let bind = new_block.unwrap().number;
 
         if bind > state.current_block {
             state.finalized_block = new_head;
@@ -222,8 +222,8 @@ impl ConsensusImpl {
             .write()
             .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
 
-        if block_data.number > state.current_block {
-            state.current_block = block_data.number;
+        if block_data.clone().unwrap().number > state.current_block {
+            state.current_block = block_data.unwrap().number;
             state.sync_status = SyncStatus::Synced;
         }
 
@@ -234,11 +234,12 @@ impl ConsensusImpl {
         for number in start..=end {
             let block = self
                 .rpc
-                .get_block_by_number(number, false)
+                .get_block_header_by_number(number, false)
                 .await
                 .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            self.process_new_block(block.parent_hash).await?;
+            // self.process_new_block(block.parent_hash).await?;
+            todo!()
         }
         Ok(())
     }
@@ -308,7 +309,7 @@ impl ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         // Verify finalized chain
-        self.verify_block_range(0, finalized.number).await
+        self.verify_block_range(0, finalized.unwrap().number).await
     }
 
     async fn is_valid_parent(&self, parent_hash: B256) -> Result<bool, ConsensusError> {
@@ -318,17 +319,18 @@ impl ConsensusImpl {
             .get_block_by_hash(parent_hash, false)
             .await
             .map_err(|e| ConsensusError::InvalidBlock(format!("Parent block not found: {}", e)))?
-            .number;
+            .unwrap().number;
 
         // Get child block (current)
         let state = self.state.read().unwrap().current_block;
         let current = self
             .rpc
-            .get_block_by_number(state, false)
+            .get_block_header_by_number(state, false)
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            Ok(parent_number + 1 == current.number && current.parent_hash == parent_hash)
+            todo!()
+            // Ok(parent_number + 1 == current.number && current.parent_hash == parent_hash)
     }
 
     async fn process_finality_update(&self, update: FinalityUpdate) -> Result<(), ConsensusError> {
@@ -396,7 +398,7 @@ impl ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         if !self
-            .is_valid_parent(block.parent_hash)
+            .is_valid_parent(block.unwrap().parent_hash)
             .await
             .expect("boolean: LINE 156")
         {
@@ -424,7 +426,7 @@ impl Concensus for ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         if !self
-            .is_valid_parent(block.parent_hash)
+            .is_valid_parent(block.unwrap().parent_hash)
             .await
             .expect("boolean: LINE 156")
         {

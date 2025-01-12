@@ -10,6 +10,8 @@ use thiserror::Error;
 use tokio::sync::{broadcast, RwLock};
 use tokio::time::Duration;
 
+const BROADCAST_CHANNEL_SIZE: usize = 1000;
+
 #[derive(Debug, Clone)]
 pub enum ChainEvent {
     NewBlock(BlockHeader),
@@ -29,22 +31,22 @@ pub enum NodeError {
 
 #[derive(Debug)]
 pub struct SyncedNodeState {
-    current_block: u64,
-    finalized_block: u64,
+    pub current_block: u64,
+    pub finalized_block: u64,
 }
 
 #[allow(non_snake_case)]
 #[derive(Debug)]
 pub struct Node {
-    consensus: Arc<ConsensusImpl>,
-    rpc: Arc<RpcClient>,
-    SyncedState: Option<RwLock<SyncedNodeState>>,
-    event_tx: broadcast::Sender<ChainEvent>,
+    pub consensus: Arc<ConsensusImpl>,
+    pub rpc: Arc<RpcClient>,
+    pub SyncedState: Option<RwLock<SyncedNodeState>>,
+    pub event_tx: broadcast::Sender<ChainEvent>,
 }
 
 impl Node {
     pub fn new(consensus: Arc<ConsensusImpl>, rpc: Arc<RpcClient>) -> Self {
-        let (event_tx, _) = broadcast::channel(100);
+        let (event_tx, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Self {
             consensus,
@@ -67,7 +69,6 @@ impl Node {
     pub fn subscribe(&self) -> broadcast::Receiver<ChainEvent> {
         self.event_tx.subscribe()
     }
-
 
     /// By Design this function will only be called when we initialy start the node and never get's called again
     /// So basically just sync the blocks from the genesis block to the latest block
@@ -95,7 +96,46 @@ impl Node {
         Ok(())
     }
 
-    async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
+    /// ISSUE: This function is not yet implemented correctly
+    pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
+        const BATCH_SIZE: u64 = 1000;
+        const MAX_RETRIES: u32 = 5;
+        for batch_start in (start..end).step_by(BATCH_SIZE as usize) {
+            let batch_end = (batch_start + BATCH_SIZE).min(end);
+
+            let futures: Vec<_> = (batch_start..batch_end)
+            .map(|block_num| async move {
+                let mut attempt = 0;  
+                loop {
+                    match self.rpc.get_block_header_by_number(block_num, false).await {
+                        Ok(Some(block)) => return Ok(block),
+                        Ok(None) => return Ok(BlockHeader::default()),
+                        Err(e) => {
+                            attempt += 1;
+                            if attempt >= MAX_RETRIES {
+                                return Err(NodeError::Rpc(e.to_string()));
+                            }
+                            let delay = 1000 * 2u64.pow(attempt - 1);
+                            info!(
+                                "Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
+                                block_num, attempt, MAX_RETRIES, delay, e
+                            );
+                            println!("Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
+                                block_num, attempt, MAX_RETRIES, delay, e
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay)).await;
+                            continue;
+                        }
+                    }
+                }
+            })
+            .collect();
+
+            let _blocks = futures::future::join_all(futures)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
+        }
         let mut state = self
             .SyncedState
             .as_ref()
@@ -103,18 +143,6 @@ impl Node {
             .write()
             .await;
 
-        let mut _start = start;
-        while _start < end {
-            let block = self
-                .rpc
-                .get_block_by_number(_start, false)
-                .await
-                .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-            // Verify block header
-            todo!();
-            _start += 1;
-        }
         state.current_block = end;
         Ok(())
     }
@@ -123,7 +151,7 @@ impl Node {
     ///
     /// This function implements an optimistic block tracking strategy to minimize RPC calls
     /// while maintaining accurate chain head tracking. It uses the mathematical relationship  
-    /// between slot numbers and block numbers (difference of 10,787,064) for validation.
+    /// between slot numbers and block numbers (difference) for validation.
     ///
     /// - Minimal RPC calls
     ///
@@ -183,7 +211,6 @@ impl Node {
                         .map_err(|e| NodeError::Rpc(e.to_string()))?;
                     state.current_block = latest;
                     block_slot_difference = latest - slot;
-                    println!("Latest block: {}", latest);
                 }
                 info!("Updated chain head {}", latest);
                 latest += 1;
@@ -191,6 +218,7 @@ impl Node {
         }
     }
 
+    ///ISSUE: This function is not yet implemented correctly
     pub async fn track_finality(&self) -> Result<(), NodeError> {
         let mut interval = tokio::time::interval(Duration::from_secs(12));
 
@@ -232,9 +260,8 @@ mod tests {
 
     use super::*;
     use alloy::primitives::B256;
-   
 
-    use tracing_subscriber:: EnvFilter;
+    use tracing_subscriber::EnvFilter;
 
     fn setup_logging() {
         tracing_subscriber::fmt()
@@ -250,10 +277,17 @@ mod tests {
     #[tokio::test]
     async fn test_rpc_client() {
         let rpc = RpcClient::new(
-            TransportBuilder::new("https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string()).build_http(),
+            TransportBuilder::new(
+                "https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string(),
+            )
+            .build_http(),
         );
-        let mock = rpc.get_block_by_number(215466241, false).await.map_err(|e| NodeError::Rpc(e.to_string())).unwrap();
-        println!("{:?}", mock.sync_aggregate);
+        let mock = rpc
+            .get_block_header_by_number(215466241, false)
+            .await
+            .map_err(|e| NodeError::Rpc(e.to_string()))
+            .unwrap();
+        println!("{:?}", mock.unwrap().sync_aggregate);
     }
 
     #[tokio::test]
@@ -289,7 +323,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_watch_new_blocks() {
-
         setup_logging();
         let rpc = RpcClient::new(
             TransportBuilder::new(

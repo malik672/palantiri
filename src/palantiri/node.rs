@@ -98,7 +98,7 @@ impl Node {
 
     /// ISSUE: This function is not yet implemented correctly
     pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
-        const BATCH_SIZE: u64 = 1000;
+        const BATCH_SIZE: u64 = 10000;
         const MAX_RETRIES: u32 = 5;
         for batch_start in (start..end).step_by(BATCH_SIZE as usize) {
             let batch_end = (batch_start + BATCH_SIZE).min(end);
@@ -153,7 +153,6 @@ impl Node {
     /// while maintaining accurate chain head tracking. It uses the mathematical relationship  
     /// between slot numbers and block numbers (difference) for validation.
     ///
-    /// - Minimal RPC calls
     ///
     /// # Arguments
     /// - &self: Reference to Node instance

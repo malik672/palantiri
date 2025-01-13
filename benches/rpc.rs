@@ -1,3 +1,4 @@
+use alloy_primitives::{address, Address};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mordor::SlotSynchronizer;
 use palantir::{
@@ -9,7 +10,7 @@ use palantir::{
     shire::concensus::{ConsensusConfig, ConsensusImpl},
     types::BlockHeader,
 };
-use std::{sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
 // Import your node components
@@ -64,7 +65,7 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
 
     let rpc = RpcClient::new(
         TransportBuilder::new(
-            "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
         )
         .build_http(),
     );
@@ -91,8 +92,58 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
     group.bench_function("sync_10_blocks", |b| {
         b.iter(|| {
             rt.block_on(async {
-                
-                node.sync_block_range(100_000, 101_000).await.unwrap()
+                node.sync_block_range(100_000, 110_000).await.unwrap()
+            })
+        });
+    });
+
+    group.finish();
+}
+
+pub fn benchmark_get_logs(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http(),
+    );
+
+    let node = Arc::new(Node::new(
+        Arc::new(ConsensusImpl::new(
+            ConsensusConfig {
+                chain_id: 1,
+                finalized_block_number: 0,
+                genesis_hash: B256::default(),
+                finalized_block_hash: B256::default(),
+                sync_period: 10,
+                min_sync_comitee: 30,
+            },
+            Arc::new(rpc.clone()),
+        )),
+        Arc::new(rpc),
+    ));
+
+    let mut group = c.benchmark_group("log_fetch");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(50)); 
+
+    // USDC contract address for testing
+    let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
+
+
+    group.bench_function("get_1000_logs", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+               let s =  node.rpc.get_logs(
+                20_000_000, 
+                20_002_000,  
+                    address, 
+                    None,  
+                ).await.unwrap();
+                println!("{:?}", s);
+                s
             })
         });
     });
@@ -152,7 +203,7 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
 criterion_group!(
     benches,
     // benchmark_sync_blocks,
-    benchmark_block_watching,
+    benchmark_get_logs,
     // benchmark_state_operations
 );
 criterion_main!(benches);

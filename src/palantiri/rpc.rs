@@ -10,7 +10,7 @@ use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use std:: sync::Arc;
 
-use crate::types::BlockHeader;
+use crate::types::{BlockHeader, Log};
 
 use super::*;
 
@@ -159,6 +159,39 @@ impl RpcClient {
         Ok(block_number)
     }
 
+    pub async fn get_logs(
+        &self,
+        from_block: u64,
+        to_block: u64,
+        address: Option<Address>,
+        topics: Option<Vec<B256>>,
+    ) -> Result<Option<Vec<Log>>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getLogs",
+            params: json!([{
+                "fromBlock": format!("0x{:x}", from_block),
+                "toBlock": format!("0x{:x}", to_block),
+                "address": address,
+                "topics": topics,
+            }]),
+            id: 1,
+        };
+    
+
+        let response: Value = self.execute(request).await?;
+    
+        if response["result"].is_null() {
+            return Ok(None);
+        }
+
+        //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
+        let block:  Vec<Log> = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
+
+        Ok(Some(block))
+    }
+
     pub async fn get_block_header_by_number(
         &self,
         number: u64,
@@ -173,7 +206,6 @@ impl RpcClient {
 
         let response: Value = self.execute(request).await?;
     
-
         if response["result"].is_null() {
             return Ok(None);
         }
@@ -199,7 +231,7 @@ impl RpcClient {
 
         let response: Value = self.execute(request).await?;
       
-        // PERFORMANCE IMPROVEMENT: Avoid cloning the response
+        //Cloning does not affect latency here from benchmark
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
         Ok(Some(block))

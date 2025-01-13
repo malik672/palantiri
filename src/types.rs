@@ -119,6 +119,24 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Log {
+    pub address: Address,
+    pub topics: Vec<B256>,
+    pub data: String,
+    #[serde(rename = "blockNumber")]
+    pub block_number: Option<U64>,
+    #[serde(rename = "blockHash")]
+    pub block_hash: Option<B256>,
+    #[serde(rename = "transactionHash")]
+    pub transaction_hash: Option<B256>,
+    #[serde(rename = "transactionIndex")]
+    pub transaction_index: Option<U64>,
+    #[serde(rename = "logIndex")]
+    pub log_index: Option<U64>,
+    pub removed: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdrawal {
     pub address: Address,
     pub amount: U256,

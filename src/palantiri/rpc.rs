@@ -192,6 +192,8 @@ impl RpcClient {
         Ok(Some(block))
     }
 
+    ///this just extracts the header of the block
+    /// fethces the block by number then extracts the header
     pub async fn get_block_header_by_number(
         &self,
         number: u64,
@@ -211,6 +213,34 @@ impl RpcClient {
         }
 
         //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
+        let block: BlockHeader = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
+
+        Ok(Some(block))
+    }
+
+
+    ///this just extracts the header of the block
+    /// fethces the block by tag then extracts the header
+    /// possibble tags are ["LATEST"], ["EARLIEST"], ["PENDING"],["SAFE"], ["FINALIZED"]
+    pub async fn get_block_header_with_tag(
+        &self,
+        tag: &str,
+        full_tx: bool,
+    ) -> Result<Option<BlockHeader>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getBlockByNumber",
+            params: json!([tag, full_tx]),
+            id: 1,
+        };
+
+        let response: Value = self.execute(request).await?;
+        
+        if response["result"].is_null() {
+            return Ok(None);
+        }
+
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
 
@@ -249,7 +279,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
@@ -260,7 +290,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_storage_at(
@@ -276,7 +306,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_transaction_count(
@@ -291,7 +321,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn send_raw_transaction(&self, data: Bytes) -> Result<B256, RpcError> {
@@ -302,7 +332,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
@@ -313,7 +343,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {

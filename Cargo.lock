@@ -2839,6 +2839,7 @@ dependencies = [
  "async-trait",
  "bls-signatures",
  "bls12_381",
+ "chrono",
  "criterion",
  "eyre",
  "futures",

@@ -70,31 +70,8 @@ impl Node {
         self.event_tx.subscribe()
     }
 
-    /// By Design this function will only be called when we initialy start the node and never get's called again
-    /// So basically just sync the blocks from the genesis block to the latest block
-    /// After this initial sync completes, block updates are handled by watch_new_blocks().
-    pub async fn sync_blocks(&mut self) -> Result<(), NodeError> {
-        let state = self
-            .SyncedState
-            .as_ref()
-            .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
-            .read()
-            .await;
-
-        let latest = self
-            .rpc
-            .get_block_number()
-            .await
-            .map_err(|e| NodeError::Rpc(e.to_string()))?;
-
-        let start = state.current_block;
-
-        if start < latest {
-            // Sync batch of blocks
-            self.sync_block_range(start, latest).await?;
-        }
-        Ok(())
-    }
+ 
+    
 
     /// ISSUE: This function is not yet implemented correctly
     pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
@@ -210,6 +187,7 @@ impl Node {
                         .map_err(|e| NodeError::Rpc(e.to_string()))?;
                     state.current_block = latest;
                     block_slot_difference = latest - slot;
+                    println!("Block slot difference updated to {}", latest);
                 }
                 info!("Updated chain head {}", latest);
                 latest += 1;
@@ -227,7 +205,7 @@ impl Node {
             // Get finalized epoch from consensus layer
             let finalized = self
                 .consensus
-                .get_finalized_number()
+                .get_latest_finalized_block_number()
                 .await
                 .map_err(|e| NodeError::Sync(e.to_string()))?;
 
@@ -238,7 +216,7 @@ impl Node {
                 .write()
                 .await;
 
-            if finalized > state.current_block {
+            if finalized > state.finalized_block {
                 // Update finalized block
                 state.finalized_block = finalized;
 
@@ -325,7 +303,7 @@ mod tests {
         setup_logging();
         let rpc = RpcClient::new(
             TransportBuilder::new(
-                "https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string(),
+                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
             )
             .build_http(),
         );
@@ -372,7 +350,5 @@ mod tests {
             )),
             Arc::new(rpc),
         );
-
-        let _a = node.sync_blocks().await.unwrap();
     }
 }

@@ -14,6 +14,9 @@ pub static mut NUM_HASH_DATA: [B256; 10] = [B256::ZERO; 10];
 pub struct BlockHeader {
     #[serde(rename = "parentHash")]
     pub parent_hash: B256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hash")]
+    pub hash: Option<B256>,
     #[serde(rename = "sha3Uncles")]
     pub uncles_hash: B256,
     #[serde(rename = "miner")]

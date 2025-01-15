@@ -2,17 +2,15 @@ use alloy::hex;
 use alloy::primitives::{keccak256, Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
 use lru::LruCache;
-use reqwest::Client;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
-use std::error::Error;
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use std::{fmt::Display, net::SocketAddr, sync::Arc};
+use std:: sync::Arc;
 
-use crate::types::{Block, BlockHeader};
+use crate::types::{BlockHeader, Log};
 
 use super::*;
 
@@ -161,11 +159,46 @@ impl RpcClient {
         Ok(block_number)
     }
 
-    pub async fn get_block_by_number(
+    pub async fn get_logs(
+        &self,
+        from_block: u64,
+        to_block: u64,
+        address: Option<Address>,
+        topics: Option<Vec<B256>>,
+    ) -> Result<Option<Vec<Log>>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getLogs",
+            params: json!([{
+                "fromBlock": format!("0x{:x}", from_block),
+                "toBlock": format!("0x{:x}", to_block),
+                "address": address,
+                "topics": topics,
+            }]),
+            id: 1,
+        };
+    
+
+        let response: Value = self.execute(request).await?;
+    
+        if response["result"].is_null() {
+            return Ok(None);
+        }
+
+        //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
+        let block:  Vec<Log> = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
+
+        Ok(Some(block))
+    }
+
+    ///this just extracts the header of the block
+    /// fethces the block by number then extracts the header
+    pub async fn get_block_header_by_number(
         &self,
         number: u64,
         full_tx: bool,
-    ) -> Result<BlockHeader, RpcError> {
+    ) -> Result<Option<BlockHeader>, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByNumber",
@@ -174,20 +207,51 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-        println!("{:?}", json!([format!("0x{:x}", number), full_tx]));
+    
+        if response["result"].is_null() {
+            return Ok(None);
+        }
 
-        //ISSUE: Perf
+        //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
 
-        Ok(block)
+        Ok(Some(block))
+    }
+
+
+    ///this just extracts the header of the block
+    /// fethces the block by tag then extracts the header
+    /// possibble tags are ["LATEST"], ["EARLIEST"], ["PENDING"],["SAFE"], ["FINALIZED"]
+    pub async fn get_block_header_with_tag(
+        &self,
+        tag: &str,
+        full_tx: bool,
+    ) -> Result<Option<BlockHeader>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getBlockByNumber",
+            params: json!([tag, full_tx]),
+            id: 1,
+        };
+
+        let response: Value = self.execute(request).await?;
+        
+        if response["result"].is_null() {
+            return Ok(None);
+        }
+
+        let block: BlockHeader = serde_json::from_value(response["result"].clone())
+            .map_err(|e| RpcError::Response(e.to_string()))?;
+
+        Ok(Some(block))
     }
 
     pub async fn get_block_by_hash(
         &self,
         hash: FixedBytes<32>,
         full_tx: bool,
-    ) -> Result<BlockHeader, RpcError> {
+    ) -> Result<Option<BlockHeader>, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBlockByHash",
@@ -196,10 +260,11 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-        //ISSUE: Perf
+      
+        //Cloning does not affect latency here from benchmark
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
-        Ok(block)
+        Ok(Some(block))
     }
 
     pub async fn get_balance(
@@ -214,7 +279,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
@@ -225,7 +290,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_storage_at(
@@ -241,7 +306,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_transaction_count(
@@ -256,7 +321,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn send_raw_transaction(&self, data: Bytes) -> Result<B256, RpcError> {
@@ -267,7 +332,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
@@ -278,7 +343,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {
@@ -323,7 +388,6 @@ impl RpcClient {
     }
 
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
-        // Execute request if cache miss
         let response = self
             .transport
             .execute(serde_json::to_string(&request).expect("convert to string"))

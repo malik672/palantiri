@@ -14,6 +14,9 @@ pub static mut NUM_HASH_DATA: [B256; 10] = [B256::ZERO; 10];
 pub struct BlockHeader {
     #[serde(rename = "parentHash")]
     pub parent_hash: B256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hash")]
+    pub hash: Option<B256>,
     #[serde(rename = "sha3Uncles")]
     pub uncles_hash: B256,
     #[serde(rename = "miner")]
@@ -116,6 +119,24 @@ pub struct Transaction {
     pub r: U256,
     pub s: U256,
     pub access_list: Option<Vec<(Address, Vec<B256>)>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Log {
+    pub address: Address,
+    pub topics: Vec<B256>,
+    pub data: String,
+    #[serde(rename = "blockNumber")]
+    pub block_number: Option<U64>,
+    #[serde(rename = "blockHash")]
+    pub block_hash: Option<B256>,
+    #[serde(rename = "transactionHash")]
+    pub transaction_hash: Option<B256>,
+    #[serde(rename = "transactionIndex")]
+    pub transaction_index: Option<U64>,
+    #[serde(rename = "logIndex")]
+    pub log_index: Option<U64>,
+    pub removed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

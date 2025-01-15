@@ -1,9 +1,13 @@
 use std::sync::{Arc, RwLock};
 
 use alloy::primitives::{Address, BlockHash, B256, U256};
-use reqwest::header;
+use chrono::{TimeZone, Utc};
+use mordor::SlotSynchronizer;
 
-use crate::{palantiri::rpc::RpcClient, types::BlockHeader};
+use crate::{
+    palantiri::{rpc::RpcClient, RpcError},
+    types::BlockHeader,
+};
 
 #[derive(Debug, Clone)]
 pub struct ConsensusConfig {
@@ -28,6 +32,7 @@ pub struct ConsensusImpl {
     pub config: ConsensusConfig,
     state: RwLock<ConsensusState>,
     rpc: Arc<RpcClient>,
+    slot_sync: SlotSynchronizer,
 }
 
 #[derive(Debug)]
@@ -39,7 +44,7 @@ pub struct SyncAggregate {
 #[derive(Debug)]
 pub struct SyncCommittee {
     pub period: u64,
-    // pub pubkeys: Vec<PublicKey>,  
+    // pub pubkeys: Vec<PublicKey>,
     // pub aggregate_pubkey: PublicKey,
 }
 
@@ -110,12 +115,12 @@ impl ConsensusImpl {
             config,
             state: RwLock::new(state),
             rpc,
+            slot_sync: SlotSynchronizer::default(),
         }
     }
 
-    pub async fn verify_block_range(&self, mut start: u64, end: u64, ) -> Result<(), ConsensusError> {
+    pub async fn verify_block_range(&self, mut start: u64, end: u64) -> Result<(), ConsensusError> {
         while start <= end {
-     
             // if !self.is_valid_parent(block.parent_hash).await? {
             //     return Err(ConsensusError::InvalidBlock(
             //         "Invalid block sequence".into(),
@@ -139,24 +144,81 @@ impl ConsensusImpl {
             .get_block_by_hash(block, false)
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?
+            .unwrap()
             .number;
-     
+
         //ISSUE
         Ok(block_number <= state.current_block)
     }
 
-    pub async fn get_finalized_head(&self) -> Result<BlockHash, ConsensusError> {
-        self.state
-            .read()
-            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))
-            .map(|state| state.finalized_block)
+    pub async fn optimistic_is_finalized_hash(
+        &self,
+        block: BlockHash,
+    ) -> Result<bool, ConsensusError> {
+        let block_data = self
+            .rpc
+            .get_block_by_hash(block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?
+            .unwrap();
+
+        // Get current slot
+        let (current_slot, _, _) = self
+            .slot_sync
+            .slot_info()
+            .map_err(|_| ConsensusError::SyncError("Slot calculation error".to_string()))?;
+
+        // Calculate block's slot
+        let block_slot = self.slot_sync.slot_at_timestamp(
+            Utc.timestamp_opt(block_data.timestamp as i64, 0)
+                .single()
+                .ok_or_else(|| ConsensusError::SyncError("Invalid block timestamp".to_string()))?,
+        );
+
+        // A block is considered finalized after 2 epochs
+        const EPOCHS_FOR_FINALITY: u64 = 2;
+        let slots_needed = EPOCHS_FOR_FINALITY * 32;
+
+        Ok(current_slot >= block_slot + slots_needed)
     }
 
-    pub async fn get_finalized_number(&self) -> Result<u64, ConsensusError> {
-        self.state
-            .read()
-            .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))
-            .map(|state| state.finalized_block_number)
+    pub async fn optimistic_is_finalized_number(&self, block: u64) -> Result<bool, ConsensusError> {
+        let block_data = self
+            .rpc
+            .get_block_header_by_number(block, false)
+            .await
+            .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?
+            .unwrap();
+
+        // Get current slot
+        let (current_slot, _, _) = self
+            .slot_sync
+            .slot_info()
+            .map_err(|_| ConsensusError::SyncError("Slot calculation error".to_string()))?;
+
+        // Calculate block's slot
+        let block_slot = self.slot_sync.slot_at_timestamp(
+            Utc.timestamp_opt(block_data.timestamp as i64, 0)
+                .single()
+                .ok_or_else(|| ConsensusError::SyncError("Invalid block timestamp".to_string()))?,
+        );
+
+        // A block is considered finalized after 2 epochs
+        const EPOCHS_FOR_FINALITY: u64 = 2;
+        let slots_needed = EPOCHS_FOR_FINALITY * 32;
+
+        Ok(current_slot >= block_slot + slots_needed)
+    }
+
+    pub async fn get_latest_finalized_block_number(&self) -> Result<u64, ConsensusError> {
+        let res = self
+            .rpc
+            .get_block_header_with_tag("finalized", false)
+            .await
+            .map_err(|_| ConsensusError::SyncError("Failed to get block header".to_string()))?
+            .ok_or_else(|| ConsensusError::SyncError("Invalid block timestamp".to_string()))?;
+
+        Ok(res.number)
     }
 
     pub async fn chain_id(&self) -> Result<u64, ConsensusError> {
@@ -200,7 +262,7 @@ impl ConsensusImpl {
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-        let bind = new_block.number;
+        let bind = new_block.unwrap().number;
 
         if bind > state.current_block {
             state.finalized_block = new_head;
@@ -222,8 +284,8 @@ impl ConsensusImpl {
             .write()
             .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
 
-        if block_data.number > state.current_block {
-            state.current_block = block_data.number;
+        if block_data.clone().unwrap().number > state.current_block {
+            state.current_block = block_data.unwrap().number;
             state.sync_status = SyncStatus::Synced;
         }
 
@@ -234,11 +296,12 @@ impl ConsensusImpl {
         for number in start..=end {
             let block = self
                 .rpc
-                .get_block_by_number(number, false)
+                .get_block_header_by_number(number, false)
                 .await
                 .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            self.process_new_block(block.parent_hash).await?;
+            // self.process_new_block(block.parent_hash).await?;
+            todo!()
         }
         Ok(())
     }
@@ -261,7 +324,6 @@ impl ConsensusImpl {
         // Ok(())
         todo!()
     }
-
 
     async fn verify_chain_tip(&self) -> Result<(), ConsensusError> {
         let state = self
@@ -308,7 +370,7 @@ impl ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         // Verify finalized chain
-        self.verify_block_range(0, finalized.number).await
+        self.verify_block_range(0, finalized.unwrap().number).await
     }
 
     async fn is_valid_parent(&self, parent_hash: B256) -> Result<bool, ConsensusError> {
@@ -318,17 +380,19 @@ impl ConsensusImpl {
             .get_block_by_hash(parent_hash, false)
             .await
             .map_err(|e| ConsensusError::InvalidBlock(format!("Parent block not found: {}", e)))?
+            .unwrap()
             .number;
 
         // Get child block (current)
         let state = self.state.read().unwrap().current_block;
         let current = self
             .rpc
-            .get_block_by_number(state, false)
+            .get_block_header_by_number(state, false)
             .await
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
-            Ok(parent_number + 1 == current.number && current.parent_hash == parent_hash)
+        todo!()
+        // Ok(parent_number + 1 == current.number && current.parent_hash == parent_hash)
     }
 
     async fn process_finality_update(&self, update: FinalityUpdate) -> Result<(), ConsensusError> {
@@ -387,8 +451,7 @@ impl ConsensusImpl {
         todo!()
     }
 
-
-   pub async fn verify_block(&self, block: B256) -> Result<(), ConsensusError> {
+    pub async fn verify_block(&self, block: B256) -> Result<(), ConsensusError> {
         let block = self
             .rpc
             .get_block_by_hash(block, false)
@@ -396,7 +459,7 @@ impl ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         if !self
-            .is_valid_parent(block.parent_hash)
+            .is_valid_parent(block.unwrap().parent_hash)
             .await
             .expect("boolean: LINE 156")
         {
@@ -407,9 +470,8 @@ impl ConsensusImpl {
     }
 
     pub async fn verify_header(&self, header: BlockHeader) -> Result<(), ConsensusError> {
-          todo!()
+        todo!()
     }
-
 }
 
 #[async_trait::async_trait]
@@ -424,7 +486,7 @@ impl Concensus for ConsensusImpl {
             .map_err(|e| ConsensusError::InvalidBlock(e.to_string()))?;
 
         if !self
-            .is_valid_parent(block.parent_hash)
+            .is_valid_parent(block.unwrap().parent_hash)
             .await
             .expect("boolean: LINE 156")
         {

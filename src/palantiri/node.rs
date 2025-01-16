@@ -195,6 +195,10 @@ impl Node {
         }
     }
 
+    pub async fn compute_hash() {
+
+    }
+
     ///ISSUE: This function is not yet implemented correctly
     pub async fn track_finality(&self) -> Result<(), NodeError> {
         let mut interval = tokio::time::interval(Duration::from_secs(12));

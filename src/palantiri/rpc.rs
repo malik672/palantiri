@@ -166,21 +166,30 @@ impl RpcClient {
         address: Option<Address>,
         topics: Option<Vec<B256>>,
     ) -> Result<Option<Vec<Log>>, RpcError> {
+
+        //pre allocation does nothing here but in terms of complexity might offer substantial perf
+        let params = {
+            let mut obj = serde_json::Map::with_capacity(4);
+            obj.insert("fromBlock".into(), format!("0x{:x}", from_block).into());
+            obj.insert("toBlock".into(), format!("0x{:x}", to_block).into());
+            if let Some(addr) = address {
+                obj.insert("address".into(), format!("0x{:x}", addr).into());
+            }
+            if let Some(t) = topics {
+                obj.insert("topics".into(), json!(t));
+            }
+            json!([obj])
+        };
+    
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getLogs",
-            params: json!([{
-                "fromBlock": format!("0x{:x}", from_block),
-                "toBlock": format!("0x{:x}", to_block),
-                "address": address,
-                "topics": topics,
-            }]),
+            params,
             id: 1,
         };
     
-
         let response: Value = self.execute(request).await?;
-    
+        
         if response["result"].is_null() {
             return Ok(None);
         }
@@ -353,7 +362,7 @@ impl RpcClient {
             params: json!([format!("0x{:x}", block)]),
             id: 1,
         };
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn execute_with_cache<T: DeserializeOwned>(

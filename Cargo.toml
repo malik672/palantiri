@@ -16,6 +16,7 @@ futures = "0.3.31"
 libp2p = {version = "0.54.1", features = ["gossipsub"]}
 log = "0.4.22"
 lru = "0.12.5"
+memchr = "2.7.4"
 mockall = "0.13.1"
 mordor = "0.1.1"
 rand = "0.8.5"

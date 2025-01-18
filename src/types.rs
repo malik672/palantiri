@@ -141,6 +141,8 @@ pub struct Log {
     pub removed: Option<bool>,
 }
 
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdrawal {
     pub address: Address,

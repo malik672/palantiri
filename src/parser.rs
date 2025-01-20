@@ -1,7 +1,6 @@
 use alloy::hex;
 use alloy_primitives::{Address, B256, U64};
-use core::{marker::PhantomData, mem};
-use memchr::memmem;
+
 
 use crate::types::Log;
 
@@ -33,7 +32,6 @@ pub struct LogIterator<'a> {
 }
 
 impl<'a> RawJsonResponse<'a> {
-
     #[inline]
     pub fn parse(input: &'a [u8]) -> Option<Self> {
         // Skip "jsonrpc" and "id" fields to find "result":[
@@ -58,92 +56,6 @@ impl<'a> RawJsonResponse<'a> {
             result_end: end - 1,
         })
     }
-    // #[cfg(target_arch = "aarch64")]
-    // #[target_feature(enable = "neon")]
-    // pub unsafe fn parse(input: &'a [u8]) -> Option<Self> {
-    //     use std::arch::aarch64::{
-    //         vceqq_u8, vdupq_n_u8, vget_lane_u64, vget_low_u8, vgetq_lane_u64, vld1q_u8,
-    //         vreinterpret_u64_u8, vreinterpretq_u64_u8,
-    //     };
-
-    //     unsafe {
-    //         // First find "result":[ using SIMD
-    //         let pattern = b"\"result\":[";
-    //         let pattern_vec = vld1q_u8(pattern.as_ptr());
-    //         let mut pos = 0;
-
-    //         // Process 16 bytes at a time
-    //         while pos + 16 <= input.len() {
-    //             let chunk = vld1q_u8(input[pos..].as_ptr());
-
-    //             // Compare current chunk with pattern
-    //             let eq_mask = vceqq_u8(chunk, pattern_vec);
-    //             let mask = vget_lane_u64(vreinterpret_u64_u8(vget_low_u8(eq_mask)), 0);
-
-    //             if mask != 0 {
-    //                 let start = pos + (mask.trailing_zeros() as usize);
-    //                 if start + 10 > input.len() {
-    //                     return None;
-    //                 }
-
-    //                 // Now find matching brackets using SIMD
-    //                 let mut cursor = start + 10; // Skip "result":[
-    //                 let mut depth = 1;
-
-    //                 // Process brackets 16 bytes at a time
-    //                 let open_bracket = vdupq_n_u8(b'[');
-    //                 let close_bracket = vdupq_n_u8(b']');
-
-    //                 while cursor + 16 <= input.len() && depth > 0 {
-    //                     let data = vld1q_u8(input[cursor..].as_ptr());
-
-    //                     // Find all brackets in current chunk
-    //                     let opens = vceqq_u8(data, open_bracket);
-    //                     let closes = vceqq_u8(data, close_bracket);
-
-    //                     // Convert to bitmasks
-    //                     let open_mask = vgetq_lane_u64(vreinterpretq_u64_u8(opens), 0) as u16;
-    //                     let close_mask = vgetq_lane_u64(vreinterpretq_u64_u8(closes), 0) as u16;
-
-    //                     // Count brackets
-    //                     depth += open_mask.count_ones() as i32;
-    //                     depth -= close_mask.count_ones() as i32;
-
-    //                     if depth == 0 {
-    //                         let close_pos = cursor + close_mask.trailing_zeros() as usize;
-    //                         return Some(Self {
-    //                             data: input,
-    //                             result_start: start + 10,
-    //                             result_end: close_pos,
-    //                         });
-    //                     }
-
-    //                     cursor += 16;
-    //                 }
-
-    //                 // Handle remaining bytes sequentially
-    //                 while depth > 0 && cursor < input.len() {
-    //                     match input[cursor] {
-    //                         b'[' => depth += 1,
-    //                         b']' => depth -= 1,
-    //                         _ => {}
-    //                     }
-    //                     cursor += 1;
-
-    //                     if depth == 0 {
-    //                         return Some(Self {
-    //                             data: input,
-    //                             result_start: start + 10,
-    //                             result_end: cursor - 1,
-    //                         });
-    //                     }
-    //                 }
-    //             }
-    //             pos += 1;
-    //         }
-    //         None
-    //     }
-    // }
 
     #[inline]
     pub fn logs(&self) -> LogIterator<'a> {
@@ -159,37 +71,52 @@ impl<'a> Iterator for LogIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        // Skip whitespace, commas until next {
-        while self.pos < self.data.len() && self.data[self.pos] != b'{' {
-            self.pos += 1;
-        }
-        if self.pos >= self.data.len() {
-            return None;
-        }
-
-        let start = self.pos;
-        let mut depth = 0;
-        while self.pos < self.data.len() {
-            match self.data[self.pos] {
-                b'{' => depth += 1,
-                b'}' => {
-                    depth -= 1;
-                    if depth == 0 {
+        let data = self.data;
+        let len = data.len();
+    
+        // Find next log start
+        if let Some(found) = memchr::memchr(b'{', &data[self.pos..]) {
+            let start = self.pos + found;
+    
+            // skip opening {
+            let mut pos = start + 1; 
+    
+            // We know the exact structure:
+            // Find topics array
+            if let Some(topics_pos) = memchr::memmem::find(&data[pos..], b"\"topics\":[") {
+                pos += topics_pos + 10; 
+    
+                // Process topics until we hit closing bracket
+                loop {
+                    // Skip whitespace/commas until quote or ]
+                    while data[pos] != b'"' && data[pos] != b']' {
+                        pos += 1;
+                    }
+    
+                    // If we hit closing bracket, move past it and break
+                    if data[pos] == b']' {
+                        pos += 1;
                         break;
                     }
+
+                    // Otherwise it's a quote, skip the topic
+                    pos += 67;  
+                    // Skip comma or closing bracket
+                    pos += 1;   
                 }
-                _ => {}
             }
-            self.pos += 1;
-        }
-
-        let log_slice = &self.data[start..=self.pos];
-        self.pos += 1;
-
-        RawLog::parse(log_slice)
-    }
-
     
+            // Find closing } of the main object
+            while pos < len && data[pos] != b'}' {
+                pos += 1;
+            }
+    
+            self.pos = pos + 1;
+            return RawLog::parse(&data[start..=pos]);
+        }
+    
+        None
+    }
 }
 
 impl<'a> RawLog<'a> {
@@ -281,7 +208,8 @@ impl<'a> RawLog<'a> {
             transaction_hash: Some(self.transaction_hash()),
             transaction_index: Some(self.transaction_index()),
             log_index: Some(self.log_index()),
-            removed: Some(false), 
+            //ISSSUE: This is not correct
+            removed: Some(false),
         }
     }
 }
@@ -296,32 +224,28 @@ fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, usize
 
 #[inline]
 fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
-    let topics_start = memchr::memmem::find(data, b"\"topics\":[")? + b"\"topics\":[".len();
+    let pos = memchr::memmem::find(data, b"\"topics\":[")? + 10; // Hard-coded length
     let mut result = [(0, 0); 4];
-    let mut pos = topics_start;
-    let mut idx = 0;
 
-    while idx < 4 {
-        // Skip until opening quote
-        while data[pos] != b'"' {
-            pos += 1;
-        }
-        pos += 1;
-        let start = pos;
+    unsafe {
+        let mut current = pos;
+        for i in 0..4 {
+            while data.get_unchecked(current) != &b'"' {
+                current += 1;
+            }
+            // skip opening quote
+            current += 1;
 
-        // Find closing quote
-        while data[pos] != b'"' {
-            pos += 1;
+            // Each topic is exactly 66 bytes (including 0x)
+            result[i] = (current, current + 66);
+            // skip topic and closing quote
+            current += 67;
         }
-        result[idx] = (start, pos);
-        idx += 1;
-        pos += 1;
     }
 
     Some(result)
 }
 
-// Fast hex parsing functions
 #[inline]
 pub fn hex_to_address(hex: &[u8]) -> Address {
     let mut bytes = [0u8; 20];
@@ -345,19 +269,13 @@ pub fn hex_to_u64(hex: &[u8]) -> U64 {
     U64::from(val)
 }
 
+/// How do i guarante safety here: simply i don't, just belief
 #[inline]
-// pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
-//     for i in 0..out.len() {
-//         let high = (hex[i * 2] as char).to_digit(16).unwrap() as u8;
-//         let low = (hex[i * 2 + 1] as char).to_digit(16).unwrap() as u8;
-//         out[i] = (high << 4) | low;
-//     }
-// }
 pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
     let len = out.len();
     let hex_ptr = hex.as_ptr();
     let out_ptr = out.as_mut_ptr();
-    
+
     unsafe {
         for i in 0..len {
             let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap() as u8;
@@ -367,9 +285,8 @@ pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
     }
 }
 
-
 pub fn parse_logs(input: &[u8]) -> Vec<Log> {
-    let response = match unsafe { RawJsonResponse::parse(input) } {
+    let response = match RawJsonResponse::parse(input) {
         Some(r) => r,
         None => return Vec::new(),
     };

@@ -5,6 +5,7 @@ use std::str::FromStr;
 use alloy::primitives::{Address, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 
+
 //THIS IS A SCOPE TO TRACK THE HASH OF A BLOCK USING THE BLOCK NUMBER
 //SINCE THE BLOCK HEADER DOES NOT CONTAIN THE HASH OF THE BLOCK, AND MAJORLY WE ARE USING THE BLOCK HEADER
 ///THIS IS A FORM OF BUFFER THAT STORES THE HASH  USING THE THE LAST DIGIT OF THE BLOCK NUMBER AS INDEX SO POSSIBLY IT CAN ONLY STORE 1-9 BLOCKS
@@ -15,6 +16,8 @@ pub struct BlockHeader {
     #[serde(rename = "parentHash")]
     pub parent_hash: B256,
     #[serde(skip_serializing_if = "Option::is_none")]
+
+    //Pun right
     #[serde(rename = "hash")]
     pub hash: Option<B256>,
     #[serde(rename = "sha3Uncles")]
@@ -139,6 +142,8 @@ pub struct Log {
     pub removed: Option<bool>,
 }
 
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdrawal {
     pub address: Address,
@@ -148,12 +153,6 @@ pub struct Withdrawal {
     pub validator_index: U64,
 }
 
-impl Block {
-    pub fn hash(&self) -> B256 {
-        // TODO: Implement block hash calculation
-        B256::ZERO
-    }
-}
 
 fn deserialize_hex_number<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where

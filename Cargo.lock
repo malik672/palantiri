@@ -2846,6 +2846,7 @@ dependencies = [
  "libp2p",
  "log",
  "lru",
+ "memchr",
  "mockall",
  "mordor",
  "rand",

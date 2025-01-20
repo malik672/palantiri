@@ -133,7 +133,7 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
     let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
 
 
-    group.bench_function("get_1000_logs", |b| {
+    group.bench_function("get_2000_logs", |b| {
         b.iter(|| {
             rt.block_on(async {
                let s =  node.rpc.get_logs(
@@ -142,7 +142,6 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
                     address, 
                     None,  
                 ).await.unwrap();
-                println!("{:?}", s);
                 s
             })
         });

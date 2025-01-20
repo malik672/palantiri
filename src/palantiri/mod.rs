@@ -95,4 +95,20 @@ impl Transport for HttpTransport {
             }
         }
     }
+
+    async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError> {
+        let response = self.client
+            .post(&self.url)
+            .header("Content-Type", "application/json")
+            .body(request)
+            .send()
+            .await
+            .map_err(|e| RpcError::Transport(e.to_string()))?;
+
+        response
+            .bytes()
+            .await
+            .map(|b| b.to_vec())
+            .map_err(|e| RpcError::Transport(e.to_string()))
+    }
 }

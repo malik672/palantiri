@@ -187,7 +187,6 @@ impl Node {
                         .map_err(|e| NodeError::Rpc(e.to_string()))?;
                     state.current_block = latest;
                     block_slot_difference = latest - slot;
-                    println!("Block slot difference updated to {}", latest);
                 }
                 info!("Updated chain head {}", latest);
                 latest += 1;
@@ -195,7 +194,11 @@ impl Node {
         }
     }
 
-    ///ISSUE: This function is not yet implemented correctly
+    pub async fn compute_hash() {
+
+    }
+
+    
     pub async fn track_finality(&self) -> Result<(), NodeError> {
         let mut interval = tokio::time::interval(Duration::from_secs(12));
 

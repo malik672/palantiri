@@ -3,5 +3,7 @@
 pub mod shire;
 pub mod mithril;
 pub mod palantiri;
+pub mod mordor;
+pub mod parser;
 
 pub mod types;

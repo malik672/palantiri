@@ -6,16 +6,18 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use std:: sync::Arc;
 
+use crate::parser::RawJsonResponse;
 use crate::types::{BlockHeader, Log};
 
 use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
+    async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
     async fn execute(&self, request: String) -> Result<String, RpcError>;
     async fn execute_with_retry(&self, request: String, retry: usize) -> Result<String, RpcError>;
     async fn connect(&self) -> Result<(), RpcError>;
@@ -159,6 +161,8 @@ impl RpcClient {
         Ok(block_number)
     }
 
+ 
+
     pub async fn get_logs(
         &self,
         from_block: u64,
@@ -166,30 +170,76 @@ impl RpcClient {
         address: Option<Address>,
         topics: Option<Vec<B256>>,
     ) -> Result<Option<Vec<Log>>, RpcError> {
+        //pre allocation does nothing here but in terms of complexity might offer substantial perf
+        let params = {
+            let mut obj = serde_json::Map::with_capacity(4);
+            obj.insert("fromBlock".into(), format!("0x{:x}", from_block).into());
+            obj.insert("toBlock".into(), format!("0x{:x}", to_block).into());
+            if let Some(addr) = address {
+                obj.insert("address".into(), format!("0x{:x}", addr).into());
+            }
+            if let Some(t) = topics {
+                obj.insert("topics".into(), json!(t));
+            }
+            json!([obj])
+        };
+
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getLogs",
-            params: json!([{
-                "fromBlock": format!("0x{:x}", from_block),
-                "toBlock": format!("0x{:x}", to_block),
-                "address": address,
-                "topics": topics,
-            }]),
+            params,
             id: 1,
         };
-    
 
-        let response: Value = self.execute(request).await?;
-    
-        if response["result"].is_null() {
+        // let response: Value = self.execute(request).await?;
+
+        // if response["result"].is_null() {
+        //     return Ok(None);
+        // }
+        // let response_bytes =
+        //     serde_json::to_vec(&response).map_err(|e| RpcError::Response(e.to_string()))?;
+
+        // if let Some(raw_response) = RawJsonResponse::parse(&response_bytes) {
+        //     // Pre-allocate vector based on number of log objects
+        //     let log_count = raw_response.data[raw_response.result_start..raw_response.result_end]
+        //         .iter()
+        //         .filter(|&&b| b == b'{')
+        //         .count();
+
+        //         let mut logs = Vec::with_capacity(log_count);
+
+        //         // Process each log with zero-copy parsing
+        //         for raw_log in raw_response.logs() {
+        //             logs.push(raw_log.to_log());
+        //         }
+
+        //         Ok(Some(logs))
+        // }  else {
+        //     Err(RpcError::Response("Failed to parse JSON response".into()))
+        // }
+
+        let response: Vec<u8> = self.execute_raw(request).await?;
+
+        if let Some(raw_response) = unsafe { RawJsonResponse::parse(&response) } {
+            let log_count = raw_response.data[raw_response.result_start..raw_response.result_end]
+                .iter()
+                .filter(|&&b| b == b'{')
+                .count();
+
+            let mut logs = Vec::with_capacity(log_count);
+            for raw_log in raw_response.logs() {
+                logs.push(raw_log.to_log());
+            }
+            Ok(Some(logs))
+        } else {
             return Ok(None);
         }
 
-        //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
-        let block:  Vec<Log> = serde_json::from_value(response["result"].clone())
-            .map_err(|e| RpcError::Response(e.to_string()))?;
+        // //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
+        // let block: Vec<Log> = serde_json::from_value(response["result"].clone())
+        //     .map_err(|e| RpcError::Response(e.to_string()))?;
 
-        Ok(Some(block))
+        // Ok(Some(block))
     }
 
     ///this just extracts the header of the block
@@ -207,7 +257,7 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-    
+
         if response["result"].is_null() {
             return Ok(None);
         }
@@ -218,7 +268,6 @@ impl RpcClient {
 
         Ok(Some(block))
     }
-
 
     ///this just extracts the header of the block
     /// fethces the block by tag then extracts the header
@@ -236,7 +285,7 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-        
+
         if response["result"].is_null() {
             return Ok(None);
         }
@@ -260,7 +309,7 @@ impl RpcClient {
         };
 
         let response: Value = self.execute(request).await?;
-      
+
         //Cloning does not affect latency here from benchmark
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
             .map_err(|e| RpcError::Response(e.to_string()))?;
@@ -353,7 +402,7 @@ impl RpcClient {
             params: json!([format!("0x{:x}", block)]),
             id: 1,
         };
-        self.execute_with_cache(request).await
+        self.execute(request).await
     }
 
     pub async fn execute_with_cache<T: DeserializeOwned>(
@@ -394,6 +443,15 @@ impl RpcClient {
             .await?;
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
+    }
+
+    pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
+        let response = self
+            .transport
+            .execute_raw(serde_json::to_string(&request).expect("convert to string"))
+            .await?;
+
+        Ok(response)
     }
 }
 

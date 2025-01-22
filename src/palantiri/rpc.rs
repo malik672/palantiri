@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
-use crate::parser::RawJsonResponse;
-use crate::types::{BlockHeader, Log};
+use crate::parser::tx_parser::parse_transaction;
+use crate::types::{BlockHeader, Log, RawJsonResponse, TransactionTx};
 
 use super::*;
 
@@ -21,6 +21,11 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     async fn execute(&self, request: String) -> Result<String, RpcError>;
     async fn execute_with_retry(&self, request: String, retry: usize) -> Result<String, RpcError>;
     async fn connect(&self) -> Result<(), RpcError>;
+}
+
+pub enum BlockIdentifier {
+    Hash(B256),
+    Number(u64),
 }
 
 #[async_trait]
@@ -191,36 +196,9 @@ impl RpcClient {
             id: 1,
         };
 
-        // let response: Value = self.execute(request).await?;
-
-        // if response["result"].is_null() {
-        //     return Ok(None);
-        // }
-        // let response_bytes =
-        //     serde_json::to_vec(&response).map_err(|e| RpcError::Response(e.to_string()))?;
-
-        // if let Some(raw_response) = RawJsonResponse::parse(&response_bytes) {
-        //     // Pre-allocate vector based on number of log objects
-        //     let log_count = raw_response.data[raw_response.result_start..raw_response.result_end]
-        //         .iter()
-        //         .filter(|&&b| b == b'{')
-        //         .count();
-
-        //         let mut logs = Vec::with_capacity(log_count);
-
-        //         // Process each log with zero-copy parsing
-        //         for raw_log in raw_response.logs() {
-        //             logs.push(raw_log.to_log());
-        //         }
-
-        //         Ok(Some(logs))
-        // }  else {
-        //     Err(RpcError::Response("Failed to parse JSON response".into()))
-        // }
-
         let response: Vec<u8> = self.execute_raw(request).await?;
 
-        if let Some(raw_response) = unsafe { RawJsonResponse::parse(&response) } {
+        if let Some(raw_response) = RawJsonResponse::parse(&response) {
             let log_count = raw_response.data[raw_response.result_start..raw_response.result_end]
                 .iter()
                 .filter(|&&b| b == b'{')
@@ -234,14 +212,111 @@ impl RpcClient {
         } else {
             return Ok(None);
         }
-
-        // //FROM BENCHMARK CLONING HERE HAS NO EFFECT ON LATENCY(STUPID RIGHT????????)
-        // let block: Vec<Log> = serde_json::from_value(response["result"].clone())
-        //     .map_err(|e| RpcError::Response(e.to_string()))?;
-
-        // Ok(Some(block))
     }
 
+    pub async fn get_transaction_by_tx_hash(
+        &self,
+        block_hash: B256,
+    ) -> Result<Option<TransactionTx>, RpcError> {
+        let params = json!([
+            format!("0x{:x}", block_hash),
+        ]);
+        
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getTransactionByHash",
+            params,
+            id: 1,
+        };
+
+        let response_bytes = self.execute_raw(request).await?;
+        
+        match parse_transaction(&response_bytes) {
+            Some(tx) => Ok(Some(tx)),
+            None => Ok(None)
+        }
+    }
+
+    /// Major Issue: slatyer
+    // pub async fn get_transaction_by_block_number(
+    //     &self,
+    //     block_number: u64,
+    // ) -> Result<Option<TransactionTx>, RpcError> {
+    //     let params = json!([
+    //         format!("0x{:x}", block_number),
+    //     ]);
+        
+    //     let request = RpcRequest {
+    //         jsonrpc: "2.0",
+    //         method: "eth_getBlockByNumber",
+    //         params,
+    //         id: 1,
+    //     };
+
+    //     let response_bytes = self.execute_raw(request).await?;
+    //     println!("{:?}", response_bytes);
+        
+    //     match parse_transaction(&response_bytes) {
+    //         Some(tx) => Ok(Some(tx)),
+    //         None => Ok(None)
+    //     }
+    // }
+    
+    // pub async fn get_transactions_by_block_range(
+    //     &self,
+    //     from_block: u64,
+    //     to_block: u64,
+    // ) -> Result<Vec<Option<TransactionTx>>, RpcError> {
+    //     let mut handles = vec![];
+        
+    //     for block_number in from_block..=to_block {
+    //         let client = self.clone();
+    //         let handle = tokio::spawn(async move {
+    //             client.get_transaction_by_block_number(block_number).await
+    //         });
+    //         handles.push(handle);
+    //     }
+    
+    //     let mut transactions = vec![];
+    //     for handle in handles {
+    //         if let Ok(result) = handle.await {
+    //             transactions.push(result?);
+    //         }
+    //     }
+    
+    //     Ok(transactions)
+    // }
+
+    pub async fn get_transaction_by_block_with_index(
+        &self,
+        block: BlockIdentifier,
+        index: U64,
+    ) -> Result<Option<TransactionTx>, RpcError> {
+        let block_param = match block {
+            BlockIdentifier::Hash(hash) => format!("0x{:x}", hash),
+            BlockIdentifier::Number(num) => format!("0x{:x}", num),
+        };
+
+        let params = json!([
+            block_param,
+            format!("0x{:x}", index),
+        ]);
+
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getTransactionByBlockAndIndex",
+            params,
+            id: 1,
+        };
+
+        let response_bytes = self.execute_raw(request).await?;
+        
+        match parse_transaction(&response_bytes) {
+            Some(tx) => Ok(Some(tx)),
+            None => Ok(None)
+        }
+    }
+    
     ///this just extracts the header of the block
     /// fethces the block by number then extracts the header
     pub async fn get_block_header_by_number(

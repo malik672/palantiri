@@ -6,59 +6,57 @@ use palantir::{
         node::{ChainEvent, Node},
         rpc::RpcClient,
         transport::http::TransportBuilder,
-    },
-    shire::concensus::{ConsensusConfig, ConsensusImpl},
-    types::BlockHeader,
+    }, parser::hex_to_b256, shire::concensus::{ConsensusConfig, ConsensusImpl}, types::BlockHeader
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
 // Import your node components
-use alloy::primitives::B256;
+use alloy::{hex, primitives::B256};
 
-// pub fn benchmark_sync_blocks(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
+pub fn benchmark_sync_blocks(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
 
-//     // Setup RPC client and node
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string()
-//         ).build_http(),
-//     );
+    // Setup RPC client and node
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/f5fa2813a91241dbb0decd8872ee2154".to_string()
+        ).build_http(),
+    );
 
-//     let node = Node::new(
-//         Arc::new(ConsensusImpl::new(
-//             ConsensusConfig {
-//                 chain_id: 1,
-//                 finalized_block_number: 0,
-//                 genesis_hash: B256::default(),
-//                 finalized_block_hash: B256::default(),
-//                 sync_period: 10,
-//                 min_sync_comitee: 30,
-//             },
-//             Arc::new(rpc.clone()),
-//         )),
-//         Arc::new(rpc),
-//     );
+    let node = Node::new(
+        Arc::new(ConsensusImpl::new(
+            ConsensusConfig {
+                chain_id: 1,
+                finalized_block_number: 0,
+                genesis_hash: B256::default(),
+                finalized_block_hash: B256::default(),
+                sync_period: 10,
+                min_sync_comitee: 30,
+            },
+            Arc::new(rpc.clone()),
+        )),
+        Arc::new(rpc),
+    );
 
-//     let mut group = c.benchmark_group("sync_operations");
+    let mut group = c.benchmark_group("sync_operations");
 
-//     // Benchmark block range sync with different sizes
-//     let start_block = 17000000;
-//     for size in [10].iter() {
-//         group.bench_function(format!("sync_{}_blocks", size), |b| {
-//             b.iter(|| {
-//                 rt.block_on(async {
-//                     black_box(
-//                         node.sync_block_range(start_block, start_block + size).await.unwrap()
-//                     )
-//                 })
-//             })
-//         });
-//     }
+    // Benchmark block range sync with different sizes
+    let start_block = 17000000;
+    for size in [1000].iter() {
+        group.bench_function(format!("sync_{}_blocks", size), |b| {
+            b.iter(|| {
+                rt.block_on(async {
+                    black_box(
+                        node.sync_block_range(start_block, start_block + size).await.unwrap()
+                    )
+                })
+            })
+        });
+    }
 
-//     group.finish();
-// }
+    group.finish();
+}
 
 pub fn benchmark_block_watching(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -87,14 +85,10 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("block_sync");
     group.sample_size(10);
-    group.measurement_time(Duration::from_secs(50)); 
+    group.measurement_time(Duration::from_secs(50));
 
     group.bench_function("sync_10_blocks", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                node.sync_block_range(100_000, 110_000).await.unwrap()
-            })
-        });
+        b.iter(|| rt.block_on(async { node.sync_block_range(100_000, 110_000).await.unwrap() }));
     });
 
     group.finish();
@@ -127,21 +121,19 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("log_fetch");
     group.sample_size(10);
-    group.measurement_time(Duration::from_secs(50)); 
+    group.measurement_time(Duration::from_secs(50));
 
     // USDC contract address for testing
     let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
 
-
     group.bench_function("get_2000_logs", |b| {
         b.iter(|| {
             rt.block_on(async {
-               let s =  node.rpc.get_logs(
-                20_000_000, 
-                20_002_000,  
-                    address, 
-                    None,  
-                ).await.unwrap();
+                let s = node
+                    .rpc
+                    .get_logs(20_000_000, 20_001_000, address, None)
+                    .await
+                    .unwrap();
                 s
             })
         });
@@ -150,59 +142,105 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
     group.finish();
 }
 
-// pub fn benchmark_state_operations(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
+pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
 
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY".to_string()
-//         ).build_http(),
-//     );
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/f5fa2813a91241dbb0decd8872ee2154".to_string(),
+        )
+        .build_http(),
+    );
 
-//     let node = Node::new(
-//         Arc::new(ConsensusImpl::new(
-//             ConsensusConfig {
-//                 chain_id: 1,
-//                 finalized_block_number: 0,
-//                 genesis_hash: B256::default(),
-//                 finalized_block_hash: B256::default(),
-//                 sync_period: 10,
-//                 min_sync_comitee: 30,
-//             },
-//             Arc::new(rpc.clone()),
-//         )),
-//         Arc::new(rpc),
-//     );
+    let node = Arc::new(Node::new(
+        Arc::new(ConsensusImpl::new(
+            ConsensusConfig {
+                chain_id: 1,
+                finalized_block_number: 0,
+                genesis_hash: B256::default(),
+                finalized_block_hash: B256::default(),
+                sync_period: 10,
+                min_sync_comitee: 30,
+            },
+            Arc::new(rpc.clone()),
+        )),
+        Arc::new(rpc),
+    ));
 
-//     let mut group = c.benchmark_group("state_operations");
+    let mut group = c.benchmark_group("log_fetch");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(50));
 
-//     // Benchmark state read/write operations
-//     group.bench_function("state_updates", |b| {
-//         b.iter(|| {
-//             rt.block_on(async {
-//                 let mut state = node.SyncedState.as_ref().unwrap().write().await;
-//                 black_box(state.current_block += 1);
-//             })
-//         });
-//     });
+    group.bench_function("get_2000_tx", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = node
+                    .rpc
+                    .get_transaction_by_tx_hash(
+                        B256::from_str("b79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267").expect("ddhoulfsdfds"),
+                    )
+                    .await
+                    .unwrap();
+                s
+            })
+        });
+    });
 
-//     group.bench_function("event_broadcast", |b| {
-//         b.iter(|| {
-//             rt.block_on(async {
-//                 black_box(
-//                     node.event_tx.send(ChainEvent::NewBlock(BlockHeader::default())).unwrap()
-//                 )
-//             })
-//         });
-//     });
+    group.finish();
+}
 
-//     group.finish();
-// }
+pub fn benchmark_get_numbers(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http(),
+    );
+
+    let node = Arc::new(Node::new(
+        Arc::new(ConsensusImpl::new(
+            ConsensusConfig {
+                chain_id: 1,
+                finalized_block_number: 0,
+                genesis_hash: B256::default(),
+                finalized_block_hash: B256::default(),
+                sync_period: 10,
+                min_sync_comitee: 30,
+            },
+            Arc::new(rpc.clone()),
+        )),
+        Arc::new(rpc),
+    ));
+
+    let mut group = c.benchmark_group("number_fetch");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(50));
+
+    // USDC contract address for testing
+    let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
+
+    group.bench_function("get_2000_logs", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = node
+                    .rpc
+                    .get_logs(20_000_000, 20_002_000, address, None)
+                    .await
+                    .unwrap();
+                s
+            })
+        });
+    });
+
+    group.finish();
+}
 
 criterion_group!(
     benches,
-    // benchmark_sync_blocks,
-    benchmark_get_logs,
-    // benchmark_state_operations
+    benchmark_sync_blocks,
+    // benchmark_get_logs,
+    // benchmark_get_tx_numbers
 );
 criterion_main!(benches);

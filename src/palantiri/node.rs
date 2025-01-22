@@ -113,14 +113,14 @@ impl Node {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
         }
-        let mut state = self
-            .SyncedState
-            .as_ref()
-            .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
-            .write()
-            .await;
+        // let mut state = self
+        //     .SyncedState
+        //     .as_ref()
+        //     .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
+        //     .write()
+        //     .await;
 
-        state.current_block = end;
+        // state.current_block = end;
         Ok(())
     }
 

@@ -86,6 +86,13 @@ pub struct SyncAggregate {
     pub sync_committee_signature: Vec<u8>,
 }
 
+#[derive(Debug)]
+pub struct RawJsonResponse<'a> {
+    pub data: &'a [u8],
+    pub result_start: usize,
+    pub result_end: usize,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Block {
@@ -100,7 +107,9 @@ pub struct Block {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub hash: B256,
-    pub nonce: U256,
+    pub nonce: U64,
+    #[serde(rename = "type")]
+    pub type_tx: Option<U64>,
     #[serde(rename = "blockHash")]
     pub block_hash: Option<B256>,
     #[serde(rename = "number")]
@@ -111,18 +120,42 @@ pub struct Transaction {
     pub to: Option<Address>,
     pub value: U256,
     #[serde(rename = "gasPrice")]
-    pub gas_price: Option<U256>,
+    pub gas_price: Option<U64>,
     #[serde(rename = "maxFeePerGas")]
-    pub max_fee_per_gas: Option<U256>,
+    pub max_fee_per_gas: Option<U64>,
     #[serde(rename = "maxPriorityFeePerGas")]
-    pub max_priority_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<U64>,
     pub gas: U256,
-    pub input: Vec<u8>,
-    pub v: u64,
-    pub r: U256,
-    pub s: U256,
+    pub input: String,
+    pub v: U64,
+    pub r: B256,
+    pub s: B256,
     pub access_list: Option<Vec<(Address, Vec<B256>)>>,
+    pub init: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionTx {
+    pub hash: B256,
+    pub nonce: U64,
+    #[serde(rename = "blockHash")]
+    pub block_hash: Option<B256>,
+    #[serde(rename = "number")]
+    pub block_number: Option<U64>,
+    #[serde(rename = "transactionIndex")]
+    pub transaction_index: Option<U64>,
+    pub from: Address,
+    pub to: Option<Address>,
+    pub value: U256,
+    #[serde(rename = "gasPrice")]
+    pub gas_price: U64,
+    pub gas: U256,
+    pub input: String,
+    pub v: U64,
+    pub r: B256,
+    pub s: B256,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Log {

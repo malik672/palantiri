@@ -2,14 +2,9 @@ use alloy::hex;
 use alloy_primitives::{Address, B256, U64};
 
 
-use crate::types::Log;
+use crate::types::{Log, RawJsonResponse};
 
-#[derive(Debug)]
-pub struct RawJsonResponse<'a> {
-    pub data: &'a [u8],
-    pub result_start: usize,
-    pub result_end: usize,
-}
+use super::{find_field, hex_to_address, hex_to_b256, hex_to_u64};
 
 #[derive(Debug)]
 pub struct RawLog<'a> {
@@ -215,14 +210,6 @@ impl<'a> RawLog<'a> {
 }
 
 #[inline]
-fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, usize)> {
-    let start = memchr::memmem::find(data, prefix)?;
-    let start = start + prefix.len();
-    let end = start + memchr::memmem::find(&data[start..], suffix)?;
-    Some((start, end))
-}
-
-#[inline]
 fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
     let pos = memchr::memmem::find(data, b"\"topics\":[")? + 10; // Hard-coded length
     let mut result = [(0, 0); 4];
@@ -246,44 +233,6 @@ fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
     Some(result)
 }
 
-#[inline]
-pub fn hex_to_address(hex: &[u8]) -> Address {
-    let mut bytes = [0u8; 20];
-    hex_to_bytes(hex, &mut bytes);
-    Address::from_slice(&bytes)
-}
-
-#[inline]
-pub fn hex_to_b256(hex: &[u8]) -> B256 {
-    let mut bytes = [0u8; 32];
-    hex_to_bytes(hex, &mut bytes);
-    B256::from_slice(&bytes)
-}
-
-#[inline]
-pub fn hex_to_u64(hex: &[u8]) -> U64 {
-    let mut val = 0u64;
-    for &b in hex {
-        val = val * 16 + (b as char).to_digit(16).unwrap() as u64;
-    }
-    U64::from(val)
-}
-
-/// How do i guarante safety here: simply i don't, just belief
-#[inline]
-pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
-    let len = out.len();
-    let hex_ptr = hex.as_ptr();
-    let out_ptr = out.as_mut_ptr();
-
-    unsafe {
-        for i in 0..len {
-            let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap() as u8;
-            let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap() as u8;
-            *out_ptr.add(i) = (high << 4) | low;
-        }
-    }
-}
 
 pub fn parse_logs(input: &[u8]) -> Vec<Log> {
     let response = match RawJsonResponse::parse(input) {

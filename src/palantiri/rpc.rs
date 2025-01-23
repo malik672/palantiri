@@ -119,7 +119,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_gas_price(&self) -> Result<Value, RpcError> {
@@ -130,7 +130,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_max_priority_fee_per_gas(&self) -> Result<Value, RpcError> {
@@ -141,7 +141,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_with_cache(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_block_number(&self) -> Result<u64, RpcError> {
@@ -153,7 +153,7 @@ impl RpcClient {
         };
 
         // Send the RPC request
-        let response: Value = self.execute(request).await?;
+        let response: Value = self.execute_raw(request).await?;
 
         // Extract result
         let hex_str = response["result"]
@@ -304,7 +304,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute(request).await?;
+        let response: Value = self.execute_raw(request).await?;
 
         if response["result"].is_null() {
             return Ok(None);
@@ -332,7 +332,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute(request).await?;
+        let response: Value = self.execute_raw(request).await?;
 
         if response["result"].is_null() {
             return Ok(None);
@@ -356,7 +356,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute(request).await?;
+        let response: Value = self.execute_raw(request).await?;
 
         //Cloning does not affect latency here from benchmark
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
@@ -376,7 +376,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
@@ -387,7 +387,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_storage_at(
@@ -403,7 +403,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_transaction_count(
@@ -418,7 +418,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn send_raw_transaction(&self, data: Bytes) -> Result<B256, RpcError> {
@@ -429,7 +429,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
@@ -440,7 +440,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute(request).await
+        self.execute_raw(request).await
     }
 
     pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {
@@ -450,47 +450,7 @@ impl RpcClient {
             params: json!([format!("0x{:x}", block)]),
             id: 1,
         };
-        self.execute(request).await
-    }
-
-    pub async fn execute_with_cache<T: DeserializeOwned>(
-        &self,
-        request: RpcRequest,
-    ) -> Result<T, RpcError> {
-        let key = keccak256(
-            serde_json::to_string(&request)
-                .expect("can't convert to string ")
-                .as_bytes(),
-        );
-
-        // Try read lock first for cache access
-        if let Ok(mut cache) = self.cache.write() {
-            if let Some(cached) = cache.get(&key) {
-                return serde_json::from_str(&cached).map_err(|e| RpcError::Parse(e.to_string()));
-            }
-        }
-
-        // Execute request if cache miss
-        let response = self
-            .transport
-            .execute(serde_json::to_string(&request).expect("convert to string"))
-            .await?;
-
-        // Update cache with write lock
-        if let Ok(mut cache) = self.cache.write() {
-            cache.insert(key, response.clone());
-        }
-
-        serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
-    }
-
-    pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
-        let response = self
-            .transport
-            .execute(serde_json::to_string(&request).expect("convert to string"))
-            .await?;
-
-        serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
+        self.execute_raw(request).await
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {

@@ -80,27 +80,68 @@ pub struct BlockHeader {
     pub sync_aggregate: Option<SyncAggregate>,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Block {
+    pub number: U64,
+    #[serde(rename = "parentHash")]
+    pub parent_hash: B256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hash")]
+    pub hash: Option<B256>,
+    #[serde(rename = "sha3Uncles")]
+    pub uncles_hash: B256,
+    #[serde(rename = "miner")]
+    pub author: Address,
+    #[serde(rename = "stateRoot")]
+    pub state_root: B256,
+    #[serde(rename = "transactionsRoot")]
+    pub transactions_root: B256,
+    #[serde(rename = "receiptsRoot")]
+    pub receipts_root: B256,
+    #[serde(rename = "logsBloom")]
+    pub logs_bloom: String,
+    pub difficulty: U64,
+    #[serde(rename = "prevRandao")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_randao: Option<B256>,
+    #[serde(rename = "gasLimit")]
+    pub gas_limit: U256,
+    #[serde(rename = "gasUsed")]
+    pub gas_used: U256,
+    pub timestamp: U64,
+    #[serde(rename = "extraData")]
+    pub extra_data: String,
+    #[serde(rename = "mixHash")]
+    #[serde(deserialize_with = "deserialize_optional_hex")]
+    pub mix_hash: B256,
+    pub nonce: U64,
+    #[serde(rename = "baseFeePerGas")]
+    pub base_fee_per_gas: Option<U256>,
+    pub transactions: Vec<B256>, 
+    pub uncles: Vec<B256>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncAggregate {
     pub sync_committee_bits: Vec<u8>,
     pub sync_committee_signature: Vec<u8>,
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Block {
-    #[serde(rename = "number")]
-    pub header: BlockHeader,
-    pub transactions: Vec<Transaction>,
-    pub uncles: Vec<BlockHeader>,
-    #[serde(rename = "withdrawals")]
-    pub withdrawals: Vec<Withdrawal>,
+#[derive(Debug)]
+pub struct RawJsonResponse<'a> {
+    pub data: &'a [u8],
+    pub result_start: usize,
+    pub result_end: usize,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub hash: B256,
-    pub nonce: U256,
+    pub nonce: U64,
+    #[serde(rename = "type")]
+    pub type_tx: Option<U64>,
     #[serde(rename = "blockHash")]
     pub block_hash: Option<B256>,
     #[serde(rename = "number")]
@@ -111,18 +152,42 @@ pub struct Transaction {
     pub to: Option<Address>,
     pub value: U256,
     #[serde(rename = "gasPrice")]
-    pub gas_price: Option<U256>,
+    pub gas_price: Option<U64>,
     #[serde(rename = "maxFeePerGas")]
-    pub max_fee_per_gas: Option<U256>,
+    pub max_fee_per_gas: Option<U64>,
     #[serde(rename = "maxPriorityFeePerGas")]
-    pub max_priority_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<U64>,
     pub gas: U256,
-    pub input: Vec<u8>,
-    pub v: u64,
-    pub r: U256,
-    pub s: U256,
+    pub input: String,
+    pub v: U64,
+    pub r: B256,
+    pub s: B256,
     pub access_list: Option<Vec<(Address, Vec<B256>)>>,
+    pub init: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionTx {
+    pub hash: B256,
+    pub nonce: U64,
+    #[serde(rename = "blockHash")]
+    pub block_hash: Option<B256>,
+    #[serde(rename = "number")]
+    pub block_number: Option<U64>,
+    #[serde(rename = "transactionIndex")]
+    pub transaction_index: Option<U64>,
+    pub from: Address,
+    pub to: Option<Address>,
+    pub value: U256,
+    #[serde(rename = "gasPrice")]
+    pub gas_price: U64,
+    pub gas: U256,
+    pub input: String,
+    pub v: U64,
+    pub r: B256,
+    pub s: B256,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Log {

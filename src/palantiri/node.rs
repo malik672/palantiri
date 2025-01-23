@@ -1,7 +1,7 @@
 use crate::{
     palantiri::rpc::RpcClient,
     shire::concensus::ConsensusImpl,
-    types::{BlockHeader, NUM_HASH_DATA},
+    types::{Block, BlockHeader, NUM_HASH_DATA},
 };
 use log::info;
 use mordor::SlotSynchronizer;
@@ -73,6 +73,58 @@ impl Node {
  
     
 
+    // /// ISSUE: This function is not yet implemented correctly
+    // pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
+    //     const BATCH_SIZE: u64 = 10000;
+    //     const MAX_RETRIES: u32 = 5;
+    //     for batch_start in (start..end).step_by(BATCH_SIZE as usize) {
+    //         let batch_end = (batch_start + BATCH_SIZE).min(end);
+
+    //         let futures: Vec<_> = (batch_start..batch_end)
+    //         .map(|block_num| async move {
+    //             let mut attempt = 0;  
+    //             loop {
+    //                 match self.rpc.get_block_header_by_number(block_num, false).await {
+    //                     Ok(Some(block)) => return Ok(block),
+    //                     Ok(None) => return Ok(BlockHeader::default()),
+    //                     Err(e) => {
+    //                         attempt += 1;
+    //                         if attempt >= MAX_RETRIES {
+    //                             return Err(NodeError::Rpc(e.to_string()));
+    //                         }
+    //                         let delay = 1000 * 2u64.pow(attempt - 1);
+    //                         info!(
+    //                             "Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
+    //                             block_num, attempt, MAX_RETRIES, delay, e
+    //                         );
+    //                         println!("Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
+    //                             block_num, attempt, MAX_RETRIES, delay, e
+    //                         );
+    //                         tokio::time::sleep(Duration::from_millis(delay)).await;
+    //                         continue;
+    //                     }
+    //                 }
+    //             }
+    //         })
+    //         .collect();
+
+    //         let _blocks = futures::future::join_all(futures)
+    //             .await
+    //             .into_iter()
+    //             .collect::<Result<Vec<_>, _>>()?;
+    //     }
+    //     let mut state = self
+    //         .SyncedState
+    //         .as_ref()
+    //         .ok_or(NodeError::State("SyncedState not initialized".to_string()))?
+    //         .write()
+    //         .await;
+
+    //     state.current_block = end;
+    //     Ok(())
+    // }
+
+
     /// ISSUE: This function is not yet implemented correctly
     pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
         const BATCH_SIZE: u64 = 10000;
@@ -84,9 +136,9 @@ impl Node {
             .map(|block_num| async move {
                 let mut attempt = 0;  
                 loop {
-                    match self.rpc.get_block_header_by_number(block_num, false).await {
+                    match self.rpc.get_block_by_number(block_num, false).await {
                         Ok(Some(block)) => return Ok(block),
-                        Ok(None) => return Ok(BlockHeader::default()),
+                        Ok(None) => return Ok(Block::default()),
                         Err(e) => {
                             attempt += 1;
                             if attempt >= MAX_RETRIES {

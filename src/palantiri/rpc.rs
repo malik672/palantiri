@@ -10,8 +10,9 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
+use crate::parser::block_parser::parse_block;
 use crate::parser::tx_parser::parse_transaction;
-use crate::types::{BlockHeader, Log, RawJsonResponse, TransactionTx};
+use crate::types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx};
 
 use super::*;
 
@@ -237,56 +238,6 @@ impl RpcClient {
         }
     }
 
-    /// Major Issue: slatyer
-    // pub async fn get_transaction_by_block_number(
-    //     &self,
-    //     block_number: u64,
-    // ) -> Result<Option<TransactionTx>, RpcError> {
-    //     let params = json!([
-    //         format!("0x{:x}", block_number),
-    //     ]);
-        
-    //     let request = RpcRequest {
-    //         jsonrpc: "2.0",
-    //         method: "eth_getBlockByNumber",
-    //         params,
-    //         id: 1,
-    //     };
-
-    //     let response_bytes = self.execute_raw(request).await?;
-    //     println!("{:?}", response_bytes);
-        
-    //     match parse_transaction(&response_bytes) {
-    //         Some(tx) => Ok(Some(tx)),
-    //         None => Ok(None)
-    //     }
-    // }
-    
-    // pub async fn get_transactions_by_block_range(
-    //     &self,
-    //     from_block: u64,
-    //     to_block: u64,
-    // ) -> Result<Vec<Option<TransactionTx>>, RpcError> {
-    //     let mut handles = vec![];
-        
-    //     for block_number in from_block..=to_block {
-    //         let client = self.clone();
-    //         let handle = tokio::spawn(async move {
-    //             client.get_transaction_by_block_number(block_number).await
-    //         });
-    //         handles.push(handle);
-    //     }
-    
-    //     let mut transactions = vec![];
-    //     for handle in handles {
-    //         if let Ok(result) = handle.await {
-    //             transactions.push(result?);
-    //         }
-    //     }
-    
-    //     Ok(transactions)
-    // }
-
     pub async fn get_transaction_by_block_with_index(
         &self,
         block: BlockIdentifier,
@@ -315,6 +266,28 @@ impl RpcClient {
             Some(tx) => Ok(Some(tx)),
             None => Ok(None)
         }
+    }
+
+    /// fethces the block by number 
+    pub async fn get_block_by_number(
+        &self,
+        number: u64,
+        full_tx: bool,
+    ) -> Result<Option<Block>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getBlockByNumber",
+            params: json!([format!("0x{:x}", number), full_tx]),
+            id: 1,
+        };
+
+        let response_bytes: Vec<u8> = self.execute_raw(request).await?;
+
+        match parse_block(&response_bytes) {
+            Some(block) => Ok(Some(block)),
+            None => Ok(None)
+        }
+
     }
     
     ///this just extracts the header of the block

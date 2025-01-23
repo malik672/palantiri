@@ -80,6 +80,48 @@ pub struct BlockHeader {
     pub sync_aggregate: Option<SyncAggregate>,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Block {
+    pub number: U64,
+    #[serde(rename = "parentHash")]
+    pub parent_hash: B256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hash")]
+    pub hash: Option<B256>,
+    #[serde(rename = "sha3Uncles")]
+    pub uncles_hash: B256,
+    #[serde(rename = "miner")]
+    pub author: Address,
+    #[serde(rename = "stateRoot")]
+    pub state_root: B256,
+    #[serde(rename = "transactionsRoot")]
+    pub transactions_root: B256,
+    #[serde(rename = "receiptsRoot")]
+    pub receipts_root: B256,
+    #[serde(rename = "logsBloom")]
+    pub logs_bloom: String,
+    pub difficulty: U64,
+    #[serde(rename = "prevRandao")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_randao: Option<B256>,
+    #[serde(rename = "gasLimit")]
+    pub gas_limit: U256,
+    #[serde(rename = "gasUsed")]
+    pub gas_used: U256,
+    pub timestamp: U64,
+    #[serde(rename = "extraData")]
+    pub extra_data: String,
+    #[serde(rename = "mixHash")]
+    #[serde(deserialize_with = "deserialize_optional_hex")]
+    pub mix_hash: B256,
+    pub nonce: U64,
+    #[serde(rename = "baseFeePerGas")]
+    pub base_fee_per_gas: Option<U256>,
+    pub transactions: Vec<B256>, 
+    pub uncles: Vec<B256>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncAggregate {
     pub sync_committee_bits: Vec<u8>,
@@ -93,16 +135,6 @@ pub struct RawJsonResponse<'a> {
     pub result_end: usize,
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Block {
-    #[serde(rename = "number")]
-    pub header: BlockHeader,
-    pub transactions: Vec<Transaction>,
-    pub uncles: Vec<BlockHeader>,
-    #[serde(rename = "withdrawals")]
-    pub withdrawals: Vec<Withdrawal>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {

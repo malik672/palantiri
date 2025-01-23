@@ -191,7 +191,6 @@ impl<'a> RawLog<'a> {
         hex_to_u64(&bytes[2..])
     }
 
-    // Convert to standard Log struct if needed
     #[inline]
     pub fn to_log(&self) -> Log {
         Log {

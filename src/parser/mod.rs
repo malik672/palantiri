@@ -1,8 +1,8 @@
 use alloy_primitives::{Address, B256, U256, U64};
 
+pub mod block_parser;
 pub mod log_parser;
 pub mod tx_parser;
-
 
 #[inline]
 pub fn hex_to_address(hex: &[u8]) -> Address {
@@ -13,7 +13,7 @@ pub fn hex_to_address(hex: &[u8]) -> Address {
     } else {
         hex
     };
-    
+
     let hex_ptr = hex.as_ptr();
     let out_ptr = bytes.as_mut_ptr();
 
@@ -24,7 +24,7 @@ pub fn hex_to_address(hex: &[u8]) -> Address {
             *out_ptr.add(i) = (high << 4) | low;
         }
     }
-    
+
     Address::from_slice(&bytes)
 }
 
@@ -37,7 +37,7 @@ pub fn hex_to_b256(hex: &[u8]) -> B256 {
     } else {
         hex
     };
-    
+
     let hex_ptr = hex.as_ptr();
     let out_ptr = bytes.as_mut_ptr();
 
@@ -48,35 +48,33 @@ pub fn hex_to_b256(hex: &[u8]) -> B256 {
             *out_ptr.add(i) = (high << 4) | low;
         }
     }
-    
+
     B256::from_slice(&bytes)
 }
 
-
 #[inline]
 pub fn hex_to_u64(hex: &[u8]) -> U64 {
-    let mut val = 0u64;
-    for &b in hex {
-        val = val * 16 + (b as char).to_digit(16).unwrap() as u64;
+    let mut bytes = [0u8; 8];
+
+    // Calculate actual number of bytes from hex length
+    let hex_len = hex.len();
+    let byte_len = hex_len / 2;
+
+    let start_idx = if byte_len > 8 { 0 } else { 8 - byte_len };
+
+    unsafe {
+        let hex_ptr = hex.as_ptr();
+        let out_ptr = bytes.as_mut_ptr();
+
+        for i in 0..byte_len {
+            let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
+            let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
+            *out_ptr.add(start_idx + i) = (high << 4) | low;
+        }
     }
-    U64::from(val)
+
+    U64::from_be_bytes(bytes)
 }
-
-/// How do i guarante safety here: simply i don't, just belief
-#[inline]
-// pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
-//     let len = out.len();
-//     let hex_ptr = hex.as_ptr();
-//     let out_ptr = out.as_mut_ptr();
-
-//     unsafe {
-//         for i in 0..len {
-//             let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap() as u8;
-//             let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap() as u8;
-//             *out_ptr.add(i) = (high << 4) | low;
-//         }
-//     }
-// }
 
 pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) -> Result<(), &'static str> {
     let out_len = out.len();
@@ -93,12 +91,12 @@ pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) -> Result<(), &'static str> {
                 Some(h) => h as u8,
                 None => return Err("invalid hex character"),
             };
-            
+
             let low = match (*hex_ptr.add(i * 2 + 1) as char).to_digit(16) {
                 Some(l) => l as u8,
                 None => return Err("invalid hex character"),
             };
-            
+
             *out_ptr.add(i) = (high << 4) | low;
         }
     }
@@ -119,24 +117,23 @@ pub fn hex_to_u256(hex: &[u8]) -> U256 {
 
     // Calculate actual number of bytes from hex length
     let hex_len = hex.len();
-    let byte_len = hex_len / 2; 
+    let byte_len = hex_len / 2;
 
-      let start_idx = if byte_len > 32 { 0 } else { 32 - byte_len };
-    
-      unsafe {
-          let hex_ptr = hex.as_ptr();
-          let out_ptr = bytes.as_mut_ptr();
-  
-          for i in 0..byte_len {
-              let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
-              let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
-              *out_ptr.add(start_idx + i) = (high << 4) | low;
-          }
-      }
+    let start_idx = if byte_len > 32 { 0 } else { 32 - byte_len };
 
-      U256::from_be_bytes(bytes)
+    unsafe {
+        let hex_ptr = hex.as_ptr();
+        let out_ptr = bytes.as_mut_ptr();
+
+        for i in 0..byte_len {
+            let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
+            let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
+            *out_ptr.add(start_idx + i) = (high << 4) | low;
+        }
+    }
+
+    U256::from_be_bytes(bytes)
 }
-
 
 #[inline]
 pub fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, usize)> {

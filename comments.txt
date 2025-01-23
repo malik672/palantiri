@@ -1,0 +1,16 @@
+/// How do i guarante safety here: simply i don't, just belief
+#[inline]
+// pub fn hex_to_bytes(hex: &[u8], out: &mut [u8]) {
+//     let len = out.len();
+//     let hex_ptr = hex.as_ptr();
+//     let out_ptr = out.as_mut_ptr();
+
+//     unsafe {
+//         for i in 0..len {
+//             let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap() as u8;
+//             let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap() as u8;
+//             *out_ptr.add(i) = (high << 4) | low;
+//         }
+//  
+   }
+// }

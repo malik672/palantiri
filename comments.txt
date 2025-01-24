@@ -14,3 +14,130 @@
 //  
    }
 // }
+
+
+
+///CONCENSUS
+// #[cfg(test)]
+// mod tests {
+
+//     use crate::transport::http::TransportBuilder;
+//     use crate::shire::concensus::ConsensusConfig;
+
+//     use super::*;
+//     use alloy::primitives::B256;
+
+//     use tracing_subscriber::EnvFilter;
+
+//     fn setup_logging() {
+//         tracing_subscriber::fmt()
+//             .with_env_filter(
+//                 EnvFilter::from_default_env()
+//                     .add_directive(tracing::Level::INFO.into())
+//                     .add_directive("light_client=debug".parse().unwrap()),
+//             )
+//             .with_test_writer()
+//             .init();
+//     }
+
+//     #[tokio::test]
+//     async fn test_rpc_client() {
+//         let rpc = RpcClient::new(
+//             TransportBuilder::new(
+//                 "https://eth-mainnet.g.alchemy.com/v2/4yEoD1kdx0Eocdx_HFeGAOPsbysH3yRM".to_string(),
+//             )
+//             .build_http(),
+//         );
+//         let mock = rpc
+//             .get_block_header_by_number(215466241, false)
+//             .await
+//             .map_err(|e| NodeError::Rpc(e.to_string()))
+//             .unwrap();
+//         println!("{:?}", mock.unwrap().sync_aggregate);
+//     }
+
+//     #[tokio::test]
+//     async fn test_node() {
+//         let rpc = RpcClient::new(
+//             TransportBuilder::new("https://sepolia.base.org".to_string()).build_http(),
+//         );
+//         let mut node = Node::new(
+//             Arc::new(ConsensusImpl::new(
+//                 ConsensusConfig {
+//                     chain_id: 1,
+//                     finalized_block_number: 0,
+//                     genesis_hash: B256::default(),
+//                     finalized_block_hash: B256::default(),
+//                     sync_period: 10,
+//                     min_sync_comitee: 30,
+//                 },
+//                 Arc::new(rpc.clone()),
+//             )),
+//             Arc::new(rpc),
+//         );
+//         node.start().await.unwrap();
+
+//         //Test is state is already synced
+//         assert!(!node.SyncedState.is_none());
+//         let binding = node.SyncedState.unwrap();
+//         let _node = binding.read().await;
+//         assert!(_node.current_block > U64::from(0));
+
+//         //At this point, the node is already synced but it's not finalized yet
+//         assert!(_node.finalized_block == U64::from(0));
+//     }
+
+//     #[tokio::test]
+//     async fn test_watch_new_blocks() {
+//         setup_logging();
+//         let rpc = RpcClient::new(
+//             TransportBuilder::new(
+//                 "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+//             )
+//             .build_http(),
+//         );
+//         let node = Node::new(
+//             Arc::new(ConsensusImpl::new(
+//                 ConsensusConfig {
+//                     chain_id: 1,
+//                     finalized_block_number: 0,
+//                     genesis_hash: B256::default(),
+//                     finalized_block_hash: B256::default(),
+//                     sync_period: 10,
+//                     min_sync_comitee: 30,
+//                 },
+//                 Arc::new(rpc.clone()),
+//             )),
+//             Arc::new(rpc),
+//         );
+
+//         // the watch new blocks checks for new blocks
+//         let _a = node.watch_new_blocks().await.unwrap();
+//     }
+
+//     #[tokio::test]
+//     async fn sync_blocks() {
+//         setup_logging();
+
+//         let rpc = RpcClient::new(
+//             TransportBuilder::new(
+//                 "https://mainnet.infura.io/v3/de690e56c52741b5a18be8c49c2f2b01".to_string(),
+//             )
+//             .build_http(),
+//         );
+//         let mut node = Node::new(
+//             Arc::new(ConsensusImpl::new(
+//                 ConsensusConfig {
+//                     chain_id: 1,
+//                     finalized_block_number: 0,
+//                     genesis_hash: B256::default(),
+//                     finalized_block_hash: B256::default(),
+//                     sync_period: 10,
+//                     min_sync_comitee: 30,
+//                 },
+//                 Arc::new(rpc.clone()),
+//             )),
+//             Arc::new(rpc),
+//         );
+//     }
+// }

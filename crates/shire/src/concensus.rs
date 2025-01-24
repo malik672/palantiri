@@ -4,10 +4,9 @@ use alloy::primitives::{Address, BlockHash, B256, U256};
 use chrono::{TimeZone, Utc};
 use mordor::SlotSynchronizer;
 
-use crate::{
-    palantiri::{rpc::RpcClient, RpcError},
-    types::BlockHeader,
-};
+use palantiri::{rpc::RpcClient, RpcError};
+
+use parser::types::BlockHeader;
 
 #[derive(Debug, Clone)]
 pub struct ConsensusConfig {
@@ -207,32 +206,33 @@ impl ConsensusImpl {
     }
 
     pub async fn chain_id(&self) -> Result<u64, ConsensusError> {
-        match self.rpc.get_chain_id().await {
-            Ok(id) => id
-                .as_u64()
-                .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
-            Err(e) => Err(ConsensusError::SyncError(e.to_string())),
-        }
+        // match self.rpc.get_chain_id().await {
+        //     Ok(id) => id
+        //         .as_u64()
+        //         .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
+        //     Err(e) => Err(ConsensusError::SyncError(e.to_string())),
+        // }
+        todo!()
     }
 
     pub async fn update_state(&self) -> Result<(), ConsensusError> {
-        let latest = self
-            .rpc
-            .get_block_number()
-            .await
-            .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
+        // let latest = self
+        //     .rpc
+        //     .get_block_number()
+        //     .await
+        //     .map_err(|e| ConsensusError::SyncError(e.to_string()))?;
 
-        let mut state = self.state.write().unwrap();
+        // let mut state = self.state.write().unwrap();
 
-        state.sync_status = if latest > state.current_block {
-            SyncStatus::Syncing {
-                target: latest,
-                current: state.current_block,
-            }
-        } else {
-            SyncStatus::Synced
-        };
-        Ok(())
+        // state.sync_status = if latest > state.current_block {
+        //     SyncStatus::Syncing {
+        //         target: latest,
+        //         current: state.current_block,
+        //     }
+        // } else {
+        //     SyncStatus::Synced
+        // };
+       todo!()
     }
 
     pub async fn update_finalized_head(&self, new_head: BlockHash) -> Result<(), ConsensusError> {
@@ -314,12 +314,13 @@ impl Concensus for ConsensusImpl {
     }
 
     async fn chain_id(&self) -> Result<u64, ConsensusError> {
-        match self.rpc.get_chain_id().await {
-            Ok(id) => id
-                .as_u64()
-                .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
-            Err(e) => Err(ConsensusError::SyncError(e.to_string())),
-        }
+        // match self.rpc.get_chain_id().await {
+        //     Ok(id) => id
+        //         .as_u64()
+        //         .ok_or_else(|| ConsensusError::SyncError("Invalid chain ID".into())),
+        //     Err(e) => Err(ConsensusError::SyncError(e.to_string())),
+        // }
+        todo!()
     }
 
     async fn genesis_hash(&self) -> B256 {

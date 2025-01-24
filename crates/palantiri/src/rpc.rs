@@ -6,13 +6,16 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::num::NonZeroUsize;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
-use crate::parser::block_parser::parse_block;
-use crate::parser::tx_parser::parse_transaction;
-use crate::types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx};
+use parser::block_parser::parse_block;
+use parser::parser_for_small_response::Generic;
+use parser::tx_parser::parse_transaction;
+use parser::{{hex_to_b256, hex_to_u256, hex_to_u64}, types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx}};
+
 
 use super::*;
 
@@ -111,7 +114,7 @@ impl RpcClient {
         }
     }
 
-    pub async fn get_chain_id(&self) -> Result<Value, RpcError> {
+    pub async fn get_chain_id(&self) -> Result<U64, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_chainId",
@@ -119,10 +122,18 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u64(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to parse chain ID".into())),
+        }
     }
 
-    pub async fn get_gas_price(&self) -> Result<Value, RpcError> {
+    pub async fn get_gas_price(&self) -> Result<U256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_gasPrice",
@@ -130,10 +141,18 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to parse gas price".into())),
+        }
     }
 
-    pub async fn get_max_priority_fee_per_gas(&self) -> Result<Value, RpcError> {
+    pub async fn get_max_priority_fee_per_gas(&self) -> Result<U256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_maxPriorityFeePerGas",
@@ -141,10 +160,20 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response(
+                "Failed to parse max priority fee".into(),
+            )),
+        }
     }
 
-    pub async fn get_block_number(&self) -> Result<u64, RpcError> {
+    pub async fn get_block_number(&self) -> Result<U64, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_blockNumber",
@@ -152,22 +181,16 @@ impl RpcClient {
             id: 1,
         };
 
-        // Send the RPC request
-        let response: Value = self.execute_raw(request).await?;
+        let response = self.execute_raw(request).await?;
 
-        // Extract result
-        let hex_str = response["result"]
-            .as_str()
-            .ok_or_else(|| RpcError::Response("Missing result field".to_string()))?;
-
-        // Convert the hexadecimal string to a decimal number
-        let block_number = u64::from_str_radix(hex_str.trim_start_matches("0x"), 16)
-            .map_err(|e| RpcError::Response(format!("Failed to parse block number: {}", e)))?;
-
-        Ok(block_number)
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u64(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to parse block number".into())),
+        }
     }
-
- 
 
     pub async fn get_logs(
         &self,
@@ -219,10 +242,8 @@ impl RpcClient {
         &self,
         block_hash: B256,
     ) -> Result<Option<TransactionTx>, RpcError> {
-        let params = json!([
-            format!("0x{:x}", block_hash),
-        ]);
-        
+        let params = json!([format!("0x{:x}", block_hash),]);
+
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getTransactionByHash",
@@ -231,10 +252,10 @@ impl RpcClient {
         };
 
         let response_bytes = self.execute_raw(request).await?;
-        
+
         match parse_transaction(&response_bytes) {
             Some(tx) => Ok(Some(tx)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -248,10 +269,7 @@ impl RpcClient {
             BlockIdentifier::Number(num) => format!("0x{:x}", num),
         };
 
-        let params = json!([
-            block_param,
-            format!("0x{:x}", index),
-        ]);
+        let params = json!([block_param, format!("0x{:x}", index),]);
 
         let request = RpcRequest {
             jsonrpc: "2.0",
@@ -261,14 +279,14 @@ impl RpcClient {
         };
 
         let response_bytes = self.execute_raw(request).await?;
-        
+
         match parse_transaction(&response_bytes) {
             Some(tx) => Ok(Some(tx)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
-    /// fethces the block by number 
+    /// fethces the block by number
     pub async fn get_block_by_number(
         &self,
         number: u64,
@@ -285,11 +303,10 @@ impl RpcClient {
 
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
-            None => Ok(None)
+            None => Ok(None),
         }
-
     }
-    
+
     ///this just extracts the header of the block
     /// fethces the block by number then extracts the header
     pub async fn get_block_header_by_number(
@@ -304,7 +321,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute_raw(request).await?;
+        let response: Value = self.execute(request).await?;
 
         if response["result"].is_null() {
             return Ok(None);
@@ -332,7 +349,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute_raw(request).await?;
+        let response: Value = self.execute(request).await?;
 
         if response["result"].is_null() {
             return Ok(None);
@@ -356,7 +373,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Value = self.execute_raw(request).await?;
+        let response: Value = self.execute(request).await?;
 
         //Cloning does not affect latency here from benchmark
         let block: BlockHeader = serde_json::from_value(response["result"].clone())
@@ -376,7 +393,15 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to parse balance".into())),
+        }
     }
 
     pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
@@ -387,7 +412,15 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(Bytes::from_str(&String::from_utf8_lossy(bytes)).unwrap())
+            }
+            None => Err(RpcError::Response("Failed to parse code".into())),
+        }
     }
 
     pub async fn get_storage_at(
@@ -403,7 +436,15 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_b256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to parse storage".into())),
+        }
     }
 
     pub async fn get_transaction_count(
@@ -418,7 +459,17 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        let response = self.execute_raw(request).await?;
+
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u64(&bytes[2..]))
+            }
+            None => Err(RpcError::Response(
+                "Failed to parse transaction count".into(),
+            )),
+        }
     }
 
     pub async fn send_raw_transaction(&self, data: Bytes) -> Result<B256, RpcError> {
@@ -429,7 +480,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        self.execute(request).await
     }
 
     pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
@@ -440,7 +491,7 @@ impl RpcClient {
             id: 1,
         };
 
-        self.execute_raw(request).await
+        self.execute(request).await
     }
 
     pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {
@@ -450,7 +501,7 @@ impl RpcClient {
             params: json!([format!("0x{:x}", block)]),
             id: 1,
         };
-        self.execute_raw(request).await
+        self.execute(request).await
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
@@ -460,6 +511,15 @@ impl RpcClient {
             .await?;
 
         Ok(response)
+    }
+
+    pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
+        let response = self
+            .transport
+            .execute(serde_json::to_string(&request).expect("convert to string"))
+            .await?;
+
+        serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
     }
 }
 

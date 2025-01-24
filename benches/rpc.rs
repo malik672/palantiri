@@ -19,7 +19,7 @@ pub fn benchmark_sync_blocks(c: &mut Criterion) {
 
     let rpc = RpcClient::new(
         TransportBuilder::new(
-            "https://mainnet.infura.io/v3/f5fa2813a91241dbb0decd8872ee2154".to_string()
+            "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string()
         ).build_http(),
     );
 
@@ -41,7 +41,7 @@ pub fn benchmark_sync_blocks(c: &mut Criterion) {
     let mut group = c.benchmark_group("sync_operations");
 
     let start_block = 17000000;
-    for size in [1000].iter() {
+    for size in [134].iter() {
         group.bench_function(format!("sync_{}_blocks", size), |b| {
             b.iter(|| {
                 rt.block_on(async {

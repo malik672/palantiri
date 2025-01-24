@@ -32,18 +32,17 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 
 ### Chain State
 
-rust
 
-CopyEdit
 
-`// Get current chain ID 
+```// Get current chain ID 
 pub async fn get_chain_id(&self) -> Result<U64, RpcError>  
 
 // Get current gas price 
 pub async fn get_gas_price(&self) -> Result<U256, RpcError>  
 
 // Get current block number 
-pub async fn get_block_number(&self) -> Result<U64, RpcError>` 
+pub async fn get_block_number(&self) -> Result<U64, RpcError>
+```
 
 ### Blocks
 

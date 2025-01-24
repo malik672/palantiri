@@ -3,11 +3,12 @@ use alloy_primitives::{Address, B256, U256, U64};
 pub mod block_parser;
 pub mod log_parser;
 pub mod tx_parser;
+pub mod parser_for_small_response;
+pub mod types;
 
 #[inline]
 pub fn hex_to_address(hex: &[u8]) -> Address {
     let mut bytes = [0u8; 20];
-    // Skip 0x if present
     let hex = if hex.len() >= 2 && hex[0] == b'0' && (hex[1] == b'x' || hex[1] == b'X') {
         &hex[2..]
     } else {
@@ -31,7 +32,6 @@ pub fn hex_to_address(hex: &[u8]) -> Address {
 #[inline]
 pub fn hex_to_b256(hex: &[u8]) -> B256 {
     let mut bytes = [0u8; 32];
-    // Skip 0x if present
     let hex = if hex.len() >= 2 && hex[0] == b'0' && (hex[1] == b'x' || hex[1] == b'X') {
         &hex[2..]
     } else {

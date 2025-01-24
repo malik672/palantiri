@@ -1,0 +1,14 @@
+[package]
+name = "shire"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+palantiri = { path = "../palantiri" }
+mordor = { path = "../mordor" }
+parser = { path = "../parser" }
+alloy.workspace = true
+alloy-primitives.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true

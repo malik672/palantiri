@@ -11,16 +11,15 @@ use palantir::{
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
-// Import your node components
 use alloy::{hex, primitives::B256};
 
 pub fn benchmark_sync_blocks(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    // Setup RPC client and node
+
     let rpc = RpcClient::new(
         TransportBuilder::new(
-            "https://mainnet.infura.io/v3/f5fa2813a91241dbb0decd8872ee2154".to_string()
+            "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string()
         ).build_http(),
     );
 
@@ -41,9 +40,8 @@ pub fn benchmark_sync_blocks(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("sync_operations");
 
-    // Benchmark block range sync with different sizes
     let start_block = 17000000;
-    for size in [1000].iter() {
+    for size in [134].iter() {
         group.bench_function(format!("sync_{}_blocks", size), |b| {
             b.iter(|| {
                 rt.block_on(async {

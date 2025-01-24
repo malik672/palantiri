@@ -1,13 +1,13 @@
+use ::palantiri::{
+    node::{ChainEvent, Node},
+    rpc::RpcClient,
+    transport::http::TransportBuilder,
+};
 use alloy_primitives::{address, Address};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mordor::SlotSynchronizer;
-use palantir::{
-    palantiri::{
-        node::{ChainEvent, Node},
-        rpc::RpcClient,
-        transport::http::TransportBuilder,
-    }, parser::hex_to_b256, shire::concensus::{ConsensusConfig, ConsensusImpl}, types::BlockHeader
-};
+use parser::{hex_to_b256, types::BlockHeader};
+
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
@@ -16,25 +16,15 @@ use alloy::{hex, primitives::B256};
 pub fn benchmark_sync_blocks(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-
     let rpc = RpcClient::new(
         TransportBuilder::new(
-            "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string()
-        ).build_http(),
+            "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
+        )
+        .build_http(),
     );
 
     let node = Node::new(
-        Arc::new(ConsensusImpl::new(
-            ConsensusConfig {
-                chain_id: 1,
-                finalized_block_number: 0,
-                genesis_hash: B256::default(),
-                finalized_block_hash: B256::default(),
-                sync_period: 10,
-                min_sync_comitee: 30,
-            },
-            Arc::new(rpc.clone()),
-        )),
+ 
         Arc::new(rpc),
     );
 
@@ -46,7 +36,9 @@ pub fn benchmark_sync_blocks(c: &mut Criterion) {
             b.iter(|| {
                 rt.block_on(async {
                     black_box(
-                        node.sync_block_range(start_block, start_block + size).await.unwrap()
+                        node.sync_block_range(start_block, start_block + size)
+                            .await
+                            .unwrap(),
                     )
                 })
             })
@@ -67,17 +59,7 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
     );
 
     let node = Arc::new(Node::new(
-        Arc::new(ConsensusImpl::new(
-            ConsensusConfig {
-                chain_id: 1,
-                finalized_block_number: 0,
-                genesis_hash: B256::default(),
-                finalized_block_hash: B256::default(),
-                sync_period: 10,
-                min_sync_comitee: 30,
-            },
-            Arc::new(rpc.clone()),
-        )),
+      
         Arc::new(rpc),
     ));
 
@@ -103,17 +85,7 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
     );
 
     let node = Arc::new(Node::new(
-        Arc::new(ConsensusImpl::new(
-            ConsensusConfig {
-                chain_id: 1,
-                finalized_block_number: 0,
-                genesis_hash: B256::default(),
-                finalized_block_hash: B256::default(),
-                sync_period: 10,
-                min_sync_comitee: 30,
-            },
-            Arc::new(rpc.clone()),
-        )),
+       
         Arc::new(rpc),
     ));
 
@@ -151,17 +123,6 @@ pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
     );
 
     let node = Arc::new(Node::new(
-        Arc::new(ConsensusImpl::new(
-            ConsensusConfig {
-                chain_id: 1,
-                finalized_block_number: 0,
-                genesis_hash: B256::default(),
-                finalized_block_hash: B256::default(),
-                sync_period: 10,
-                min_sync_comitee: 30,
-            },
-            Arc::new(rpc.clone()),
-        )),
         Arc::new(rpc),
     ));
 
@@ -175,7 +136,10 @@ pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
                 let s = node
                     .rpc
                     .get_transaction_by_tx_hash(
-                        B256::from_str("b79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267").expect("ddhoulfsdfds"),
+                        B256::from_str(
+                            "b79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267",
+                        )
+                        .expect("ddhoulfsdfds"),
                     )
                     .await
                     .unwrap();
@@ -198,17 +162,7 @@ pub fn benchmark_get_numbers(c: &mut Criterion) {
     );
 
     let node = Arc::new(Node::new(
-        Arc::new(ConsensusImpl::new(
-            ConsensusConfig {
-                chain_id: 1,
-                finalized_block_number: 0,
-                genesis_hash: B256::default(),
-                finalized_block_hash: B256::default(),
-                sync_period: 10,
-                min_sync_comitee: 30,
-            },
-            Arc::new(rpc.clone()),
-        )),
+       
         Arc::new(rpc),
     ));
 

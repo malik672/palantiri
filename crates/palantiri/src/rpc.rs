@@ -1,5 +1,5 @@
 use alloy::hex;
-use alloy::primitives::{keccak256, Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
+use alloy::primitives::{Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
 use lru::LruCache;
 use serde::de::DeserializeOwned;
@@ -31,6 +31,7 @@ pub enum BlockIdentifier {
     Hash(B256),
     Number(u64),
 }
+
 
 #[async_trait]
 pub trait Method {
@@ -384,12 +385,12 @@ impl RpcClient {
     pub async fn get_balance(
         &self,
         address: Address,
-        block: BlockNumber,
+        state: &str,
     ) -> Result<U256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBalance",
-            params: json!([format!("0x{:x}", address), block]),
+            params: json!([format!("0x{:x}", address), state]),
             id: 1,
         };
 
@@ -404,7 +405,7 @@ impl RpcClient {
         }
     }
 
-    pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
+    pub async fn get_code(&self, address: Address, block: String) -> Result<Bytes, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getCode",
@@ -426,8 +427,8 @@ impl RpcClient {
     pub async fn get_storage_at(
         &self,
         address: Address,
-        slot: U256,
-        block: BlockNumber,
+        slot: B256,
+        block: String,
     ) -> Result<B256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
@@ -483,7 +484,7 @@ impl RpcClient {
         self.execute(request).await
     }
 
-    pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
+    pub async fn get_transaction_receipt(&self, hash: B256) -> Result<Value, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getTransactionReceipt",

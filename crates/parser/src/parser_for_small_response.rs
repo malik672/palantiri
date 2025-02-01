@@ -2,11 +2,11 @@ use super::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
 
 #[derive(Debug)]
 pub struct RawFee {
-    oldest_block: (usize, usize),
-    reward: Vec<(usize, usize)>,
-    bae_fee_per_gas: Vec<(usize, usize)>,
-    gas_used_ratio: Vec<(usize, usize)>,
-    base_fee_per_blobs_gas: Vec<(usize, usize)>,
+    pub oldest_block: (usize, usize),
+    pub reward: Vec<(usize, usize)>,
+    pub base_fee_per_gas: Vec<(usize, usize)>,
+    pub gas_used_ratio: Vec<(usize, usize)>,
+    pub base_fee_per_blobs_gas: Vec<(usize, usize)>,
 }
 
 /// single data reply from the rpc call
@@ -28,7 +28,7 @@ impl<'a> RawFee {
         Some(Self {
             oldest_block: find_field(input, b"\"oldestBlock\":\"", b"\"")?,
             reward: parse_array(input, b"\"reward\":")?,
-            bae_fee_per_gas: parse_array(input, b"\"baseFeePerGas\":")?,
+            base_fee_per_gas: parse_array(input, b"\"baseFeePerGas\":")?,
             gas_used_ratio: parse_array(input, b"\"gasUsedRatio\":")?,
             base_fee_per_blobs_gas: parse_array(input, b"\"baseFeePerBlobGas\":")?,
         })

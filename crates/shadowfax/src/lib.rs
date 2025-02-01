@@ -12,6 +12,14 @@ use std::io;
 #[global_allocator]
 static SHADOWFAX: ShadowfaxAllocator = ShadowfaxAllocator::new();
 
+
+// Swift as Shadowfax memory arena
+struct ShadowfaxArena {
+    chunks: Vec<(*mut u8, usize)>,
+    current_chunk: usize,
+    chunk_size: usize,
+}
+
 // Swift as the Lord of all Horses
 #[repr(align(4096))]
 
@@ -33,13 +41,6 @@ struct ShadowfaxSSTable {
     mmap: memmap2::MmapMut,
     index: Arc<parking_lot::RwLock<dashmap::DashMap<Vec<u8>, u64>>>,
     ring: io_uring::IoUring,
-}
-
-// Swift as Shadowfax memory arena
-struct ShadowfaxArena {
-    chunks: Vec<(*mut u8, usize)>,
-    current_chunk: usize,
-    chunk_size: usize,
 }
 
 struct ShadowfaxAllocator {
@@ -78,6 +79,7 @@ impl ShadowfaxAllocator {
         );
 
         if ptr == libc::MAP_FAILED {
+            //slight issue in handling allocation failure
             std::alloc::handle_alloc_error(layout);
         }
 
@@ -155,6 +157,7 @@ impl ShadowfaxMemTable {
             .as_nanos() as u64;
 
         entries.par_iter().for_each(|(key, value)| {
+            //slight issue
             self.data.insert(key.clone(), (value.clone(), timestamp));
         });
 
@@ -213,7 +216,7 @@ impl ShadowfaxSSTable {
         })
     }
 
-    // Swift as Shadowfax read
+    // Swift as Shadowfax read(automated)
     #[cfg(target_arch = "x86_64")]
     unsafe fn vectorized_read(&self, keys: &[Vec<u8>]) -> Vec<Option<Bytes>> {
         use std::arch::x86_64::*;
@@ -261,8 +264,7 @@ impl ShadowfaxLSM {
             cpu_cores,
         }
     }
-
-    // Swift as Shadowfax batch write
+    
     pub async fn batch_write(&self, entries: Vec<(Vec<u8>, Bytes)>) -> std::io::Result<()> {
         let mt_idx = self
             .active_memtable
@@ -285,7 +287,6 @@ impl ShadowfaxLSM {
         Ok(())
     }
 
-    // Swift as Shadowfax parallel read
     pub async fn parallel_read(&self, keys: Vec<Vec<u8>>) -> Vec<Option<Bytes>> {
 
         let results = keys.chunks(1024).enumerate().map(|(i, chunk)| {

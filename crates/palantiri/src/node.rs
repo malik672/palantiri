@@ -1,13 +1,13 @@
 use crate::rpc::RpcClient;
-
-use alloy_primitives::U64;
+use alloy_primitives::{keccak256, FixedBytes, B256, U64};
 use log::info;
 use mordor::SlotSynchronizer;
+use parser::types::{Block, BlockHeader};
+use rlp::encode::encode_list;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{broadcast, RwLock};
 use tokio::time::Duration;
-use parser::types::{Block, BlockHeader, NUM_HASH_DATA};
 
 const BROADCAST_CHANNEL_SIZE: usize = 1000;
 
@@ -44,7 +44,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new( rpc: Arc<RpcClient>) -> Self {
+    pub fn new(rpc: Arc<RpcClient>) -> Self {
         let (event_tx, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Self {
@@ -68,35 +68,33 @@ impl Node {
         self.event_tx.subscribe()
     }
 
- 
-    
-
     /// ISSUE: This function is not yet implemented correctly
-    pub async fn sync_block_range_head(&self, start: u64, end: u64) -> Result<(), NodeError> {
-        const BATCH_SIZE: u64 = 10000;
-        const MAX_RETRIES: u32 = 5;
-        for batch_start in (start..end).step_by(BATCH_SIZE as usize) {
-            let batch_end = (batch_start + BATCH_SIZE).min(end);
+    pub async fn sync_block_range_head(
+        &self,
+        start: u64,
+        end: u64,
+        batch_size: u64,
+        max_retries: u32,
+    ) -> Result<(), NodeError> {
+        for batch_start in (start..end).step_by(batch_size as usize) {
+            let batch_end = (batch_start + batch_size).min(end);
 
             let futures: Vec<_> = (batch_start..batch_end)
             .map(|block_num| async move {
-                let mut attempt = 0;  
+                let mut attempt = 0;
                 loop {
                     match self.rpc.get_block_header_by_number(block_num, false).await {
                         Ok(Some(block)) => return Ok(block),
                         Ok(None) => return Ok(BlockHeader::default()),
                         Err(e) => {
                             attempt += 1;
-                            if attempt >= MAX_RETRIES {
+                            if attempt >= max_retries {
                                 return Err(NodeError::Rpc(e.to_string()));
                             }
                             let delay = 1000 * 2u64.pow(attempt - 1);
                             info!(
                                 "Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
-                                block_num, attempt, MAX_RETRIES, delay, e
-                            );
-                            println!("Failed to fetch block {}, attempt {}/{}. Retrying in {}ms. Error: {}", 
-                                block_num, attempt, MAX_RETRIES, delay, e
+                                block_num, attempt, max_retries, delay, e
                             );
                             tokio::time::sleep(Duration::from_millis(delay)).await;
                             continue;
@@ -122,7 +120,6 @@ impl Node {
         Ok(())
     }
 
-
     /// ISSUE: This function is not yet implemented correctly
     pub async fn sync_block_range(&self, start: u64, end: u64) -> Result<(), NodeError> {
         const BATCH_SIZE: u64 = 1000;
@@ -132,7 +129,7 @@ impl Node {
 
             let futures: Vec<_> = (batch_start..batch_end)
             .map(|block_num| async move {
-                let mut attempt = 0;  
+                let mut attempt = 0;
                 loop {
                     match self.rpc.get_block_by_number(block_num, false).await {
                         Ok(Some(block)) => return Ok(block),
@@ -244,11 +241,28 @@ impl Node {
         }
     }
 
-    pub async fn compute_hash() {
+    pub async fn compute_hash(
+        block_number: U64,
+        block_hash: B256,
+        tx_root: B256,
+        state_root: B256,
+        receipts_root: B256,
+    ) -> FixedBytes<32> {
+        let mut out: Vec<u8> = Vec::new();
 
+        let fields: [&[u8]; 5] = [
+            // ISSUE
+            block_number.as_le_slice(),
+            block_hash.0.as_slice(),
+            tx_root.0.as_slice(),
+            state_root.0.as_slice(),
+            receipts_root.0.as_slice(),
+        ];
+
+        encode_list::<&[u8], [u8]>(&fields, &mut out);
+        keccak256(out)
     }
 
-    
     pub async fn track_finality(&self) -> Result<(), NodeError> {
         let mut interval = tokio::time::interval(Duration::from_secs(12));
 
@@ -281,4 +295,3 @@ impl Node {
         }
     }
 }
-

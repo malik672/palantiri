@@ -5,7 +5,6 @@ use std::str::FromStr;
 use alloy::primitives::{Address, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 
-
 //THIS IS A SCOPE TO TRACK THE HASH OF A BLOCK USING THE BLOCK NUMBER
 //SINCE THE BLOCK HEADER DOES NOT CONTAIN THE HASH OF THE BLOCK, AND MAJORLY WE ARE USING THE BLOCK HEADER
 ///THIS IS A FORM OF BUFFER THAT STORES THE HASH  USING THE THE LAST DIGIT OF THE BLOCK NUMBER AS INDEX SO POSSIBLY IT CAN ONLY STORE 1-9 BLOCKS
@@ -16,7 +15,6 @@ pub struct BlockHeader {
     #[serde(rename = "parentHash")]
     pub parent_hash: B256,
     #[serde(skip_serializing_if = "Option::is_none")]
-
     //Pun right
     #[serde(rename = "hash")]
     pub hash: Option<B256>,
@@ -80,7 +78,6 @@ pub struct BlockHeader {
     pub sync_aggregate: Option<SyncAggregate>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Block {
     pub number: U64,
@@ -118,7 +115,7 @@ pub struct Block {
     pub nonce: U64,
     #[serde(rename = "baseFeePerGas")]
     pub base_fee_per_gas: Option<U256>,
-    pub transactions: Vec<B256>, 
+    pub transactions: Vec<B256>,
     pub uncles: Vec<B256>,
 }
 
@@ -134,7 +131,6 @@ pub struct RawJsonResponse<'a> {
     pub result_start: usize,
     pub result_end: usize,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
@@ -188,7 +184,6 @@ pub struct TransactionTx {
     pub s: B256,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Log {
     pub address: Address,
@@ -207,7 +202,24 @@ pub struct Log {
     pub removed: Option<bool>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TransactionRequest {
+    pub from: Option<Address>,
+    pub to: Option<Address>,
+    pub gas: Option<U256>,
+    pub gas_price: Option<U256>,
+    pub value: Option<U256>,
+    pub data: Option<String>,
+    pub nonce: Option<U256>,
+}
 
+#[derive(Debug, Serialize)]
+pub struct FilterParams {
+    pub from_block: Option<U64>,
+    pub to_block: Option<U64>,
+    pub address: Option<Address>,
+    pub topics: Option<Vec<Option<B256>>>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdrawal {
@@ -217,7 +229,6 @@ pub struct Withdrawal {
     #[serde(rename = "validatorIndex")]
     pub validator_index: U64,
 }
-
 
 fn deserialize_hex_number<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where

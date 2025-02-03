@@ -19,3 +19,10 @@ tokio.workspace = true
 log.workspace = true
 futures.workspace = true
 criterion.workspace = true
+rlp.workspace = true
+dotenv.workspace = true
+
+[[bench]]
+name="rpc"
+harness = false
+

@@ -44,10 +44,7 @@ impl SlotSynchronizer {
 
     pub fn current_slot(&self) -> Result<u64, ()> {
         let now = Utc::now();
-        let duration_since_genesis = now
-            .signed_duration_since(self.genesis_time)
-            .num_seconds();
-        
+        let duration_since_genesis = now.signed_duration_since(self.genesis_time).num_seconds();
 
         Ok(duration_since_genesis as u64 / SLOT_DURATION)
     }
@@ -68,10 +65,7 @@ impl SlotSynchronizer {
     /// Returns slot number, seconds remaining used for the current slot and seconds remaining for the next slot
     pub fn slot_info(&self) -> Result<SlotTiming, ()> {
         let now = Utc::now();
-        let duration_since_genesis = now
-            .signed_duration_since(self.genesis_time)
-            .num_seconds();
-
+        let duration_since_genesis = now.signed_duration_since(self.genesis_time).num_seconds();
 
         let duration_secs = duration_since_genesis as u64;
         let slot = duration_secs / SLOT_DURATION;
@@ -94,7 +88,6 @@ impl SlotSynchronizer {
         let duration_since_genesis = timestamp
             .signed_duration_since(self.genesis_time)
             .num_seconds();
-        
 
         duration_since_genesis as u64 / SLOT_DURATION
     }
@@ -132,5 +125,4 @@ mod tests {
     fn test_invalid_genesis() {
         assert!(SlotSynchronizer::new(i64::MIN).is_err());
     }
-
 }

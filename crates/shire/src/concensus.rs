@@ -1,10 +1,10 @@
 use std::sync::{Arc, RwLock};
 
-use alloy::primitives::{Address, BlockHash, B256, U256};
+use alloy::primitives::{Address, BlockHash, B256};
 use chrono::{TimeZone, Utc};
 use mordor::SlotSynchronizer;
 
-use palantiri::{rpc::RpcClient, RpcError};
+use palantiri::rpc::RpcClient;
 
 use parser::types::BlockHeader;
 
@@ -232,7 +232,7 @@ impl ConsensusImpl {
         // } else {
         //     SyncStatus::Synced
         // };
-       todo!()
+        todo!()
     }
 
     pub async fn update_finalized_head(&self, new_head: BlockHash) -> Result<(), ConsensusError> {
@@ -266,9 +266,9 @@ impl ConsensusImpl {
             .map_err(|_| ConsensusError::SyncError("Lock poisoned".into()))?;
 
         // Verify finalized chain
-        Ok(self.optimistic_is_finalized_hash(state.finalized_block).await?)
+        self.optimistic_is_finalized_hash(state.finalized_block)
+            .await
     }
-
 
     pub fn verify_sync_committee(
         &self,
@@ -298,7 +298,6 @@ impl ConsensusImpl {
 #[async_trait::async_trait]
 impl Concensus for ConsensusImpl {
     type Error = ConsensusError;
-
 
     async fn is_finalized(&self, block: BlockHash) -> bool {
         let state = self.state.read().unwrap();

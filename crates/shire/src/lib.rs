@@ -1,5 +1,3 @@
-
-
 pub mod concensus;
 
 // Single cache-line optimized fork bitmap ||  5 bits per fork ||
@@ -10,9 +8,14 @@ const FORK: u32 = 0b00001 |           // Genesis   (bits 0-4)
     0b01000 << 15 |     // Capella   (bits 15-19)
     0b10000 << 20; // Deneb     (bits 20-24)
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct Forks(u32);
+
+impl Default for Forks {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Forks {
     pub fn new() -> Self {

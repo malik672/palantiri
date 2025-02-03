@@ -1,7 +1,8 @@
 use alloy::hex;
-use alloy::primitives::{keccak256, Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
+use alloy::primitives::{Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
 use lru::LruCache;
+use parser::types::{FilterParams, TransactionRequest};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -14,8 +15,10 @@ use std::time::{Duration, Instant};
 use parser::block_parser::parse_block;
 use parser::parser_for_small_response::Generic;
 use parser::tx_parser::parse_transaction;
-use parser::{{hex_to_b256, hex_to_u256, hex_to_u64}, types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx}};
-
+use parser::{
+    types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
+    {hex_to_b256, hex_to_u256, hex_to_u64},
+};
 
 use super::*;
 
@@ -23,8 +26,6 @@ use super::*;
 pub trait Transport: Send + Sync + std::fmt::Debug {
     async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
     async fn execute(&self, request: String) -> Result<String, RpcError>;
-    async fn execute_with_retry(&self, request: String, retry: usize) -> Result<String, RpcError>;
-    async fn connect(&self) -> Result<(), RpcError>;
 }
 
 pub enum BlockIdentifier {
@@ -234,7 +235,7 @@ impl RpcClient {
             }
             Ok(Some(logs))
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 
@@ -381,15 +382,11 @@ impl RpcClient {
         Ok(Some(block))
     }
 
-    pub async fn get_balance(
-        &self,
-        address: Address,
-        block: BlockNumber,
-    ) -> Result<U256, RpcError> {
+    pub async fn get_balance(&self, address: Address, state: &str) -> Result<U256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getBalance",
-            params: json!([format!("0x{:x}", address), block]),
+            params: json!([format!("0x{:x}", address), state]),
             id: 1,
         };
 
@@ -404,7 +401,7 @@ impl RpcClient {
         }
     }
 
-    pub async fn get_code(&self, address: Address, block: BlockNumber) -> Result<Bytes, RpcError> {
+    pub async fn get_code(&self, address: Address, block: String) -> Result<Bytes, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getCode",
@@ -426,8 +423,8 @@ impl RpcClient {
     pub async fn get_storage_at(
         &self,
         address: Address,
-        slot: U256,
-        block: BlockNumber,
+        slot: B256,
+        block: String,
     ) -> Result<B256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
@@ -472,6 +469,146 @@ impl RpcClient {
         }
     }
 
+    pub async fn estimate_gas(
+        &self,
+        tx: &TransactionRequest,
+        block: Option<BlockNumber>,
+    ) -> Result<U256, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_estimateGas",
+            params: json!([tx, block.map(|b| format!("0x{:x}", b))]),
+            id: 1,
+        };
+
+        let response = self.execute_raw(request).await?;
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to estimate gas".into())),
+        }
+    }
+
+    pub async fn new_filter(&self, filter: &FilterParams) -> Result<U256, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_newFilter",
+            params: json!([filter]),
+            id: 1,
+        };
+
+        let response = self.execute_raw(request).await?;
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to create filter".into())),
+        }
+    }
+
+    pub async fn new_block_filter(&self) -> Result<U256, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_newBlockFilter",
+            params: json!([]),
+            id: 1,
+        };
+
+        let response = self.execute_raw(request).await?;
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(hex_to_u256(&bytes[2..]))
+            }
+            None => Err(RpcError::Response("Failed to create block filter".into())),
+        }
+    }
+
+    pub async fn get_filter_logs(&self, filter_id: U256) -> Result<Vec<Log>, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getFilterLogs",
+            params: json!([format!("0x{:x}", filter_id)]),
+            id: 1,
+        };
+
+        let response = self.execute_raw(request).await?;
+        if let Some(raw_response) = RawJsonResponse::parse(&response) {
+            let mut logs = Vec::new();
+            for raw_log in raw_response.logs() {
+                logs.push(raw_log.to_log());
+            }
+            Ok(logs)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    pub async fn syncing(&self) -> Result<bool, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_syncing",
+            params: json!([]),
+            id: 1,
+        };
+
+        let response = self.execute_raw(request).await?;
+        match Generic::parse(&response) {
+            Some(generic) => {
+                let bytes = &response[generic.result_start.0..generic.result_start.1];
+                Ok(bytes != b"false")
+            }
+            None => Err(RpcError::Response("Failed to get sync status".into())),
+        }
+    }
+
+
+    ///ISSUE: MAKE THISS USE EXECUTE_RAW
+    pub async fn fee_history(
+        &self,
+        block_count: U64,
+        newest_block: U64,
+        reward_percentiles: &[f64],
+    ) -> Result<Value, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_feeHistory",
+            params: json!([
+                format!("0x{:x}", block_count),
+                format!("0x{:x}", newest_block),
+                reward_percentiles
+            ]),
+            id: 1,
+        };
+
+        self.execute(request).await
+    }
+
+
+    ///ISSUE: MAKE THISS USE EXECUTE_RAW
+    pub async fn get_proof(
+        &self,
+        address: Address,
+        storage_keys: &[B256],
+        block: BlockNumber,
+    ) -> Result<Value, RpcError> {
+        let request = RpcRequest {
+            jsonrpc: "2.0",
+            method: "eth_getProof",
+            params: json!([
+                format!("0x{:x}", address),
+                storage_keys,
+                format!("0x{:x}", block)
+            ]),
+            id: 1,
+        };
+
+        self.execute(request).await
+    }
+
     pub async fn send_raw_transaction(&self, data: Bytes) -> Result<B256, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
@@ -483,7 +620,7 @@ impl RpcClient {
         self.execute(request).await
     }
 
-    pub async fn get_transaction_receipt(&self, hash: FixedBytes<32>) -> Result<Value, RpcError> {
+    pub async fn get_transaction_receipt(&self, hash: B256) -> Result<Value, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
             method: "eth_getTransactionReceipt",

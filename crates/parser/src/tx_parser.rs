@@ -155,7 +155,7 @@ impl<'a> RawJsonResponse<'a> {
             return None;
         }
         let start = memchr::memmem::find(input, b"\"result\":{")?;
-        let start = start + 9; 
+        let start = start + 9;
 
         // Find matching closing }
         let mut pos = start;
@@ -173,7 +173,7 @@ impl<'a> RawJsonResponse<'a> {
             data: input,
             result_start: start,
             // exclude closing }
-            result_end: pos - 1, 
+            result_end: pos - 1,
         })
     }
 

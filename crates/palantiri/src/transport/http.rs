@@ -1,6 +1,6 @@
-
 use async_trait::async_trait;
 use std::time::Duration;
+
 
 use crate::{HttpTransport, RpcError};
 
@@ -49,5 +49,4 @@ impl TransportBuilder {
     pub fn build_http_with_config(self, param: HttpTransport) -> HttpTransport {
         HttpTransport::new_with_config(param)
     }
-
 }

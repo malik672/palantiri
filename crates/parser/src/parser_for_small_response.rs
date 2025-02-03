@@ -1,4 +1,4 @@
-use super::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use super::find_field;
 
 #[derive(Debug)]
 pub struct RawFee {
@@ -22,9 +22,9 @@ pub struct RawJsonResponse<'a> {
     pub result_end: usize,
 }
 
-impl<'a> RawFee {
+impl RawFee {
     #[inline]
-    pub fn parse(input: &'a [u8]) -> Option<Self> {
+    pub fn parse(input: &[u8]) -> Option<Self> {
         Some(Self {
             oldest_block: find_field(input, b"\"oldestBlock\":\"", b"\"")?,
             reward: parse_array(input, b"\"reward\":")?,

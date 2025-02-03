@@ -1,7 +1,6 @@
 use alloy::hex;
 use alloy_primitives::{Address, B256, U64};
 
-
 use crate::types::{Log, RawJsonResponse};
 
 use super::{find_field, hex_to_address, hex_to_b256, hex_to_u64};
@@ -68,26 +67,26 @@ impl<'a> Iterator for LogIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let data = self.data;
         let len = data.len();
-    
+
         // Find next log start
         if let Some(found) = memchr::memchr(b'{', &data[self.pos..]) {
             let start = self.pos + found;
-    
+
             // skip opening {
-            let mut pos = start + 1; 
-    
+            let mut pos = start + 1;
+
             // We know the exact structure:
             // Find topics array
             if let Some(topics_pos) = memchr::memmem::find(&data[pos..], b"\"topics\":[") {
-                pos += topics_pos + 10; 
-    
+                pos += topics_pos + 10;
+
                 // Process topics until we hit closing bracket
                 loop {
                     // Skip whitespace/commas until quote or ]
                     while data[pos] != b'"' && data[pos] != b']' {
                         pos += 1;
                     }
-    
+
                     // If we hit closing bracket, move past it and break
                     if data[pos] == b']' {
                         pos += 1;
@@ -95,21 +94,21 @@ impl<'a> Iterator for LogIterator<'a> {
                     }
 
                     // Otherwise it's a quote, skip the topic
-                    pos += 67;  
+                    pos += 67;
                     // Skip comma or closing bracket
-                    pos += 1;   
+                    pos += 1;
                 }
             }
-    
+
             // Find closing } of the main object
             while pos < len && data[pos] != b'}' {
                 pos += 1;
             }
-    
+
             self.pos = pos + 1;
             return RawLog::parse(&data[start..=pos]);
         }
-    
+
         None
     }
 }
@@ -231,7 +230,6 @@ fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
 
     Some(result)
 }
-
 
 pub fn parse_logs(input: &[u8]) -> Vec<Log> {
     let response = match RawJsonResponse::parse(input) {

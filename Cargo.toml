@@ -27,3 +27,4 @@ criterion = "0.5.1"
 clap = {version = "4.5.18", features = ["env"] }
 rlp = { git = "https://github.com/malik672/rlp" }
 clap_derive = "4.5.18"
+dotenv = "0.15.0"

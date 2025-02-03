@@ -3,15 +3,18 @@ use reqwest::Client;
 use rpc::Transport;
 use std::time::Duration;
 
+pub mod libp2p;
+pub mod node;
 pub mod rpc;
 pub mod transport;
-pub mod node;
-pub mod libp2p;
+use std::env;
+use dotenv;
 
 #[derive(Debug)]
 pub struct HttpTransport {
     client: Client,
-    url: String,
+    urls: Vec<String>,
+    current_url: usize,
     timeout: Duration,
 }
 
@@ -30,20 +33,63 @@ impl HttpTransport {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .pool_idle_timeout(Duration::from_secs(60))
+            .tcp_keepalive(Duration::from_secs(60))
             .build()
             .expect("Failed to create HTTP client");
 
         Self {
             client,
-            url,
+            urls : vec![url],
+            current_url: 0,
             timeout: Duration::from_secs(30),
         }
+    }
+
+    pub fn new_from_env() -> Self {
+        dotenv::dotenv().ok();
+
+    
+        let primary_url = env::var("PRIMARY_URL")
+            .expect("PRIMARY_URL must be set in environment");
+
+        let mut urls = vec![primary_url];
+        if let Ok(fallback1) = env::var("FALLBACK_URL_1") {
+            urls.push(fallback1);
+        }
+        if let Ok(fallback2) = env::var("FALLBACK_URL_2") {
+            urls.push(fallback2);
+        }
+
+        let transport_timeout = env::var("TRANSPORT_TIMEOUT")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse()
+            .unwrap_or(30);
+
+        let client = Client::builder()
+            .timeout(Duration::from_secs(transport_timeout))
+            .pool_idle_timeout(Duration::from_secs(60))
+            .tcp_keepalive(Duration::from_secs(60))
+            .build()
+            .expect("Failed to create HTTP client");
+
+        Self {
+            client,
+            urls,
+            current_url: 0,
+            timeout: Duration::from_secs(transport_timeout),
+        }
+    }
+
+    pub fn with_fallback_urls(mut self, urls: Vec<String>) -> Self {
+        self.urls.extend(urls);
+        self
     }
 
     pub fn new_with_config(self) -> Self {
         Self {
             client: self.client,
-            url: self.url,
+            urls: self.urls,
+            current_url: self.current_url,
             timeout: self.timeout,
         }
     }
@@ -56,10 +102,12 @@ impl HttpTransport {
 
 #[async_trait]
 impl Transport for HttpTransport {
+
     async fn execute(&self, request: String) -> Result<String, RpcError> {
-        let response = self
-            .client
-            .post(&self.url)
+        let url = &self.urls[self.current_url];
+        
+        let response = self.client
+            .post(url)
             .header("Content-Type", "application/json")
             .body(request)
             .send()
@@ -72,33 +120,12 @@ impl Transport for HttpTransport {
             .map_err(|e| RpcError::Transport(e.to_string()))
     }
 
-    async fn connect(&self) -> Result<(), RpcError> {
-        self.client
-            .get(&self.url)
-            .send()
-            .await
-            .map_err(|e| RpcError::Transport(e.to_string()))?;
-        Ok(())
-    }
-
-    async fn execute_with_retry(&self, request: String, retry: usize) -> Result<String, RpcError> {
-        let mut attempts = 0;
-        
-        loop {
-            attempts += 1;
-            
-            match self.execute(request.clone()).await {
-                Ok(response) => return Ok(response),
-                Err(_) if attempts < retry => continue,
-                Err(e) => return Err(e),
-            }
-        }
-    }
-
     async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError> {
+        let url = &self.urls[self.current_url];
+
         let response = self.client
-            .post(&self.url)
-            .header("Content-Type", "application/json")
+            .post(url)
+            .header("Content-Type", "application/json") 
             .body(request)
             .send()
             .await

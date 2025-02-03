@@ -1,5 +1,5 @@
-use crate::types::Block;
 use super::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use crate::types::Block;
 
 #[derive(Debug)]
 pub struct RawBlock<'a> {
@@ -31,7 +31,6 @@ pub struct RawJsonResponse<'a> {
     pub result_start: usize,
     pub result_end: usize,
 }
-
 
 impl<'a> RawBlock<'a> {
     #[inline]
@@ -93,10 +92,10 @@ impl<'a> RawBlock<'a> {
                 .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
                 .collect(),
             uncles: self
-            .uncles
-            .iter()
-            .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
-            .collect(),
+                .uncles
+                .iter()
+                .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
+                .collect(),
         }
     }
 
@@ -119,7 +118,7 @@ impl<'a> RawBlock<'a> {
                 pos += 1;
             }
             result.push((tx_start, pos));
-            pos += 1; 
+            pos += 1;
         }
 
         Some(result)
@@ -129,7 +128,7 @@ impl<'a> RawBlock<'a> {
         let start = memchr::memmem::find(data, b"\"uncles\":[")?;
         let mut pos = start + b"\"uncles\":[".len();
         let mut result = Vec::new();
-        
+
         while data[pos] != b']' {
             while data[pos] != b'"' && data[pos] != b']' {
                 pos += 1;
@@ -137,20 +136,19 @@ impl<'a> RawBlock<'a> {
             if data[pos] == b']' {
                 break;
             }
-            pos += 1;  
+            pos += 1;
             let tx_start = pos;
-            
+
             while data[pos] != b'"' {
                 pos += 1;
             }
             result.push((tx_start, pos));
-            pos += 1;  
+            pos += 1;
         }
-        
-        Some(result)
-     }
-}
 
+        Some(result)
+    }
+}
 
 impl<'a> RawJsonResponse<'a> {
     #[inline]
@@ -159,7 +157,7 @@ impl<'a> RawJsonResponse<'a> {
             return None;
         }
         let start = memchr::memmem::find(input, b"\"result\":{")?;
-        let start = start + 9; 
+        let start = start + 9;
 
         // Find matching closing }
         let mut pos = start;
@@ -177,7 +175,7 @@ impl<'a> RawJsonResponse<'a> {
             data: input,
             result_start: start,
             // exclude closing }
-            result_end: pos - 1, 
+            result_end: pos - 1,
         })
     }
 

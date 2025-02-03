@@ -118,15 +118,19 @@ async fn execute(
         } => {
             let addr = Address::from_str(&address)?;
             let slot: alloy_primitives::FixedBytes<32> = B256::from_str(&slot)?;
-            Ok(serde_json::to_value(client.get_storage_at(addr, slot, block).await?)?)
+            Ok(serde_json::to_value(
+                client.get_storage_at(addr, slot, block).await?,
+            )?)
         }
         Commands::Receipt { hash } => {
             let hash = B256::from_str(&hash)?;
-            Ok(serde_json::to_value(client.get_transaction_receipt(hash).await?)?)
+            Ok(serde_json::to_value(
+                client.get_transaction_receipt(hash).await?,
+            )?)
         }
-        Commands::BlockReceipts { number } => {
-            Ok(serde_json::to_value(client.get_block_receipts(number).await?)?)
-        }
+        Commands::BlockReceipts { number } => Ok(serde_json::to_value(
+            client.get_block_receipts(number).await?,
+        )?),
     }
 }
 

@@ -1,4 +1,5 @@
 pub mod concensus;
+pub mod concensus_rpc;
 
 // Single cache-line optimized fork bitmap ||  5 bits per fork ||
 const FORK_BITS: u32 = 0b11111;

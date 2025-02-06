@@ -23,15 +23,12 @@ pub fn benchmark_sync_blocks(c: &mut Criterion) {
         .build_http(),
     );
 
-    let node = Node::new(
- 
-        Arc::new(rpc),
-    );
+    let node = Node::new(Arc::new(rpc));
 
     let mut group = c.benchmark_group("sync_operations");
 
     let start_block = 17000000;
-    for size in [134].iter() {
+    for size in [10000].iter() {
         group.bench_function(format!("sync_{}_blocks", size), |b| {
             b.iter(|| {
                 rt.block_on(async {
@@ -58,10 +55,7 @@ pub fn benchmark_block_watching(c: &mut Criterion) {
         .build_http(),
     );
 
-    let node = Arc::new(Node::new(
-      
-        Arc::new(rpc),
-    ));
+    let node = Arc::new(Node::new(Arc::new(rpc)));
 
     let mut group = c.benchmark_group("block_sync");
     group.sample_size(10);
@@ -84,10 +78,7 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
         .build_http(),
     );
 
-    let node = Arc::new(Node::new(
-       
-        Arc::new(rpc),
-    ));
+    let node = Arc::new(Node::new(Arc::new(rpc)));
 
     let mut group = c.benchmark_group("log_fetch");
     group.sample_size(10);
@@ -122,9 +113,7 @@ pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
         .build_http(),
     );
 
-    let node = Arc::new(Node::new(
-        Arc::new(rpc),
-    ));
+    let node = Arc::new(Node::new(Arc::new(rpc)));
 
     let mut group = c.benchmark_group("log_fetch");
     group.sample_size(10);
@@ -161,10 +150,7 @@ pub fn benchmark_get_numbers(c: &mut Criterion) {
         .build_http(),
     );
 
-    let node = Arc::new(Node::new(
-       
-        Arc::new(rpc),
-    ));
+    let node = Arc::new(Node::new(Arc::new(rpc)));
 
     let mut group = c.benchmark_group("number_fetch");
     group.sample_size(10);

@@ -3202,6 +3202,8 @@ dependencies = [
  "mordor",
  "palantiri",
  "parser",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 

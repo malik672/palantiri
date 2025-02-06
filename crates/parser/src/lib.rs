@@ -5,6 +5,7 @@ pub mod log_parser;
 pub mod parser_for_small_response;
 pub mod tx_parser;
 pub mod types;
+pub mod beacon;
 
 #[inline]
 pub fn hex_to_address(hex: &[u8]) -> Address {

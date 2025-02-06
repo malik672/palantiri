@@ -29,8 +29,8 @@ pub struct CheckpointData {
 
 impl Source {
     pub fn parse_source(input: &[u8]) -> Option<Self> {
-        let source = find_field(input, b"\"source\":", b"}")?;
-        let epoch = find_field(&input[source.0..source.1], b"\"epoch\":\"", b"\"")?;
+        let source = find_field(input, b"\"source\": {", b"}")?;
+        let epoch = find_field(&input[source.0..source.1], b"\"epoch\":\" {", b"\"")?;
         let root = find_field(&input[source.0..source.1], b"\"root\":\"", b"\"")?;
 
         Some(Self {
@@ -40,7 +40,7 @@ impl Source {
     }
 
     pub fn parse_target(input: &[u8]) -> Option<Self> {
-        let target = find_field(input, b"\"target\":", b"}")?;
+        let target = find_field(input, b"\"target\": {", b"}")?;
         let epoch = find_field(&input[target.0..target.1], b"\"epoch\":\"", b"\"")?;
         let root = find_field(&input[target.0..target.1], b"\"root\":\"", b"\"")?;
 
@@ -57,12 +57,8 @@ impl FinalityCheckpoint {
             let code = find_field(input, b"\"code\":", b",")?;
             let code_str = std::str::from_utf8(&input[code.0..code.1]).ok()?;
             return Some(Self {
-                execution_optimistic: false,
-                finalized: false,
-                aggregation_bits: U64::default(),
-                signature: B256::default(),
-                data: CheckpointData::default(),
                 code: Some(code_str.parse().ok()?),
+                ..Default::default()
             });
         }
         let optimistic = find_field(input, b"\"execution_optimistic\":", b",")?;

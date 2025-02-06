@@ -119,11 +119,7 @@ pub struct Block {
     pub uncles: Vec<B256>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncAggregate {
-    pub sync_committee_bits: Vec<u8>,
-    pub sync_committee_signature: Vec<u8>,
-}
+
 
 #[derive(Debug)]
 pub struct RawJsonResponse<'a> {
@@ -248,4 +244,81 @@ where
     }
 
     B256::from_str(s.trim_start_matches("0x")).map_err(serde::de::Error::custom)
+}
+
+/// ********** BEACON OF GONDOR ********** ///
+
+/// Isssues
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncAggregate {
+    pub sync_committee_bits: Vec<u8>,
+    pub sync_committee_signature: Vec<B256>,
+}
+
+#[derive(Debug, Default)]
+pub struct LightClientBootstrap<'a> {
+    pub version: &'a str,
+    pub header: Header,
+    pub current_sync_committee: SyncCommittee,
+    pub current_sync_committee_branch: Vec<B256>,
+    pub code: Option<u16>,
+}
+
+#[derive(Debug, Default)]
+pub struct Header {
+    pub beacon: Beacon,
+}
+
+#[derive(Debug, Default)]
+pub struct Beacon {
+    pub slot: U64,
+    pub proposer_index: U64,
+    pub parent_root: B256,
+    pub state_root: B256,
+    pub body_root: B256,
+}
+
+#[derive(Debug, Default)]
+pub struct SyncCommittee {
+    pub pub_keys: Vec<B256>,
+    pub aggregate_pubkey: B256,
+}
+
+pub struct LightClientHeader {
+    pub header: Header,
+}
+
+pub struct LightClientUpdate {
+    pub attested_header: LightClientHeader,
+    pub next_sync_committee: SyncCommittee,
+    pub next_sync_committee_branch: Vec<B256>,
+    pub finalized_header: LightClientHeader,
+    pub finality_branch: Vec<B256>,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+}
+
+pub struct LightClientFinalityUpdate {
+    pub attested_header: LightClientHeader,
+    pub finalized_header: LightClientHeader,
+    pub finality_branch: Vec<B256>,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+}
+
+pub struct LightClientOptimisticUpdate {
+    pub attested_header: LightClientHeader,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+}
+
+
+pub struct LightClientStore {
+    pub finalized_header: LightClientHeader,
+    pub current_sync_committee: SyncCommittee,
+    pub next_sync_committee: SyncCommittee,
+    pub best_valid_update: Option<LightClientUpdate>,
+    pub optimistic_header: LightClientHeader,
+    pub previous_max_active_participants: U64,
+    pub current_max_active_participants: U64,
 }

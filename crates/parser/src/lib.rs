@@ -143,3 +143,4 @@ pub fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, u
     let end = start + memchr::memmem::find(&data[start..], suffix)?;
     Some((start, end))
 }
+

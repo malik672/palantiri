@@ -3,4 +3,4 @@
 .env.development
 .env.production
 .env.test
-cargo.lock
+Cargo.lock

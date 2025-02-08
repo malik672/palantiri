@@ -250,9 +250,10 @@ impl Node {
     ) -> FixedBytes<32> {
         let mut out: Vec<u8> = Vec::new();
 
+        let number_bytes = block_number.to_be_bytes_vec();
+
         let fields: [&[u8]; 5] = [
-            // ISSUE
-            block_number.as_le_slice(),
+            &number_bytes,
             block_hash.0.as_slice(),
             tx_root.0.as_slice(),
             state_root.0.as_slice(),

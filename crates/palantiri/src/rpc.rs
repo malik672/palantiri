@@ -33,15 +33,6 @@ pub enum BlockIdentifier {
     Number(u64),
 }
 
-#[async_trait]
-pub trait Method {
-    type Params: Serialize;
-    type Response: DeserializeOwned;
-
-    fn name() -> &'static str;
-    fn params(&self) -> Self::Params;
-}
-
 #[derive(Debug, Clone)]
 struct CacheEntry {
     response: String,
@@ -565,7 +556,6 @@ impl RpcClient {
         }
     }
 
-
     ///ISSUE: MAKE THISS USE EXECUTE_RAW
     pub async fn fee_history(
         &self,
@@ -586,7 +576,6 @@ impl RpcClient {
 
         self.execute(request).await
     }
-
 
     ///ISSUE: MAKE THISS USE EXECUTE_RAW
     pub async fn get_proof(

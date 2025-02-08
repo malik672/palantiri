@@ -63,8 +63,8 @@ impl FinalityCheckpoint {
         }
         let optimistic = find_field(input, b"\"execution_optimistic\":", b",")?;
         let finalized = find_field(input, b"\"finalized\":", b",")?;
-        let bits = find_field(input, b"\"aggregation_bits\":\"", b",")?;
-        let sig = find_field(input, b"\"signature\":\"", b",")?;
+        let bits = find_field(input, b"\"aggregation_bits\":\"", b"\"")?;
+        let sig = find_field(input, b"\"signature\":\"", b"\"")?;
         let data = CheckpointData::parse(input)?;
 
         Some(Self {

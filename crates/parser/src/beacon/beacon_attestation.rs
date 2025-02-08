@@ -30,7 +30,7 @@ pub struct CheckpointData {
 impl Source {
     pub fn parse_source(input: &[u8]) -> Option<Self> {
         let source = find_field(input, b"\"source\": {", b"}")?;
-        let epoch = find_field(&input[source.0..source.1], b"\"epoch\":\" {", b"\"")?;
+        let epoch = find_field(&input[source.0..source.1], b"\"epoch\":\"", b"\"")?;
         let root = find_field(&input[source.0..source.1], b"\"root\":\"", b"\"")?;
 
         Some(Self {

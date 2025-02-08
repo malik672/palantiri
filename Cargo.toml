@@ -13,7 +13,7 @@ bls-signatures = "0.15.0"
 bls12_381 = { version = "0.8.0", features = ["experimental"] }
 chrono = "0.4.39"
 futures = "0.3.31"
-libp2p = { version = "0.54.1", features = ["gossipsub"] }
+libp2p = { version = "0.54.1", features = ["gossipsub","macros", "request-response", "identify", "tcp", "noise", "yamux", "tokio", "ping", "kad"] }
 log = "0.4.22"
 lru = "0.12.5"
 memchr = "2.7.4"

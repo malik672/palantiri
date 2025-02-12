@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-
+mordor = { path = "../mordor" }
 alloy.workspace = true
 alloy-primitives.workspace = true
 serde.workspace = true

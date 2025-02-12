@@ -16,3 +16,5 @@ serde.workspace = true
 serde_json.workspace = true
 libp2p.workspace = true
 tokio.workspace = true
+futures.workspace = true
+reqwest.workspace = true

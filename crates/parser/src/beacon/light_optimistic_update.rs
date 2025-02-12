@@ -1,25 +1,23 @@
 use alloy_primitives::{B256, U64};
 
-use crate::{
-    find_field, hex_to_b256,
-    types::{Beacon, SyncCommittee},
-};
+use crate::{find_field, hex_to_b256,  types::Beacon};
 
 #[derive(Debug, Default, Clone)]
-pub struct LightClientBootstrap {
+pub struct LightOptimisticUpdate {
     pub version: String,
-    pub header: Header,
-    pub current_sync_committee: SyncCommittee,
-    pub current_sync_committee_branch: Vec<B256>,
+    pub attested_header: Beacon,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
     pub code: Option<u16>,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Header {
-    pub beacon: Beacon,
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SyncAggregate {
+    pub sync_committee_bits: B256,
+    pub sync_committee_signature: B256,
 }
 
-impl LightClientBootstrap {
+impl LightOptimisticUpdate {
     pub fn parse(input: &[u8]) -> Option<Self> {
         if let Some(_pos) = memchr::memmem::find(input, b"\"code\":") {
             let code = find_field(input, b"\"code\":", b"}")?;
@@ -37,7 +35,18 @@ impl LightClientBootstrap {
         let parent_root = find_field(input, b"\"parent_root\":\"", b"\"")?;
         let state_root = find_field(input, b"\"state_root\":\"", b"\"")?;
         let body_root = find_field(input, b"\"body_root\":\"", b"\"")?;
-        let aggregate_pub_key = find_field(input, b"\"aggregate_pubkey\":\"", b"\"")?;
+        let sync_committee_bits = find_field(input, b"\"sync_committee_bits\":\"", b"\"")?;
+        let sync_committee_signatures =
+            find_field(input, b"\"sync_committee_signature\":\"", b"\"")?;
+
+        let sync_aggregate = SyncAggregate {
+            sync_committee_bits: hex_to_b256(&input[sync_committee_bits.0..sync_committee_bits.1]),
+            sync_committee_signature: hex_to_b256(
+                &input[sync_committee_signatures.0..sync_committee_signatures.1],
+            ),
+        };
+
+        let signature_slot = find_field(&input, b"\"signature_slot\":\"", b"\"")?;
 
         let beacon = Beacon {
             slot: std::str::from_utf8(&input[slot.0..slot.1])
@@ -53,28 +62,13 @@ impl LightClientBootstrap {
             body_root: hex_to_b256(&input[body_root.0..body_root.1]),
         };
 
-        let current_sync_committee = SyncCommittee {
-            pub_keys: Self::parse_pub_keys_array(input)?
-                .iter()
-                .map(|&(start, end)| hex_to_b256(&input[start..end]))
-                .collect(),
-            aggregate_pubkey: hex_to_b256(&input[aggregate_pub_key.0..aggregate_pub_key.1]),
-        };
-
-        let current_sync_committee_branch: Vec<B256> = Self::parse_committee_branch_array(input)?
-            .iter()
-            .map(|&(start, end)| hex_to_b256(&input[start..end]))
-            .collect();
-
-        let header = Header { beacon };
-
-        Some(LightClientBootstrap {
+        Some(LightOptimisticUpdate {
             version: std::str::from_utf8(&input[version.0..version.1])
                 .ok()?
                 .to_string(),
-            header,
-            current_sync_committee,
-            current_sync_committee_branch,
+            attested_header: beacon,
+            sync_aggregate,
+            signature_slot: std::str::from_utf8(&input[signature_slot.0..signature_slot.1]).unwrap().parse().unwrap(),
             code: None,
         })
     }

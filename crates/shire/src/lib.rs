@@ -1,8 +1,9 @@
 #![feature(trivial_bounds)]
 
+pub mod checkpoint;
 pub mod concensus;
-pub mod concensus_rpc;
 pub mod libp2p;
+pub mod light_client;
 
 // Single cache-line optimized fork bitmap ||  5 bits per fork ||
 const FORK_BITS: u32 = 0b11111;

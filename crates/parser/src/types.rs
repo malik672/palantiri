@@ -119,8 +119,6 @@ pub struct Block {
     pub uncles: Vec<B256>,
 }
 
-
-
 #[derive(Debug)]
 pub struct RawJsonResponse<'a> {
     pub data: &'a [u8],
@@ -269,7 +267,7 @@ pub struct Header {
     pub beacon: Beacon,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Beacon {
     pub slot: U64,
     pub proposer_index: U64,
@@ -278,7 +276,7 @@ pub struct Beacon {
     pub body_root: B256,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SyncCommittee {
     pub pub_keys: Vec<B256>,
     pub aggregate_pubkey: B256,
@@ -330,7 +328,6 @@ pub struct LightClientStore {
     pub previous_max_active_participants: U64,
     pub current_max_active_participants: U64,
 }
-
 
 pub static MAINNET_BOOTNODES : [&str; 4] = [
     "enode://d860a01f9722d78051619d1e2351aba3f43f943f6f00718d1b9baa4101932a1f5011f16bb2b1bb35db20d6fe28fa0bf09636d26a87d31de9ec6203eeedb1f666@18.138.108.67:30303",   // bootnode-aws-ap-southeast-1-001

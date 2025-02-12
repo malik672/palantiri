@@ -1,11 +1,11 @@
 use alloy_primitives::{Address, B256, U256, U64};
 
+pub mod beacon;
 pub mod block_parser;
 pub mod log_parser;
 pub mod parser_for_small_response;
 pub mod tx_parser;
 pub mod types;
-pub mod beacon;
 
 #[inline]
 pub fn hex_to_address(hex: &[u8]) -> Address {
@@ -143,4 +143,3 @@ pub fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, u
     let end = start + memchr::memmem::find(&data[start..], suffix)?;
     Some((start, end))
 }
-

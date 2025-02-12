@@ -76,6 +76,12 @@ pub enum ConsensusError {
     SyncError(String),
     #[error("Invalid Signature")]
     InvalidSignature,
+    #[error("Invalid response: {0}")]
+    Response(String),
+    #[error("No consensus")]
+    NoConsensus,
+    #[error("Parse error")]
+    Parse,
 }
 
 #[async_trait::async_trait]

@@ -50,7 +50,6 @@ impl<'a> RawJsonResponse<'a> {
             });
         }
 
-
         let pos = data_start + data_marker.len();
         let mut bracket_depth = 0;
         let mut data_end = pos;

@@ -9,6 +9,8 @@ pub const SLOT_DURATION: u64 = 12;
 pub const SLOTS_PER_EPOCH: u64 = 32;
 /// Duration of each epoch in seconds
 pub const EPOCH_DURATION: u64 = SLOT_DURATION * SLOTS_PER_EPOCH;
+/// Number of slots in a period
+pub const SLOTS_PER_PERIOD: u64 = 8192;
 
 pub type SlotTiming = (u64, u8, u8);
 

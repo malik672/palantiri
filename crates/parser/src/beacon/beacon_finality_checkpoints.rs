@@ -32,7 +32,7 @@ impl<'a> BeaconFinalityData {
         } else {
             let code = find_field(input, b"\"code\":", b",")?;
             let code_str = std::str::from_utf8(&input[code.0..code.1]).ok()?;
-            Some(Self{
+            Some(Self {
                 previous_justified: FinalityCheckpoint::default(),
                 current_justified: FinalityCheckpoint::default(),
                 finalized: FinalityCheckpoint::default(),

@@ -4,6 +4,9 @@ use std::str::FromStr;
 
 use alloy::primitives::{Address, B256, U256, U64};
 use serde::{Deserialize, Serialize};
+use tree_hash_derive::TreeHash;
+use tree_hash::{TreeHash, Hash256};
+
 
 //THIS IS A SCOPE TO TRACK THE HASH OF A BLOCK USING THE BLOCK NUMBER
 //SINCE THE BLOCK HEADER DOES NOT CONTAIN THE HASH OF THE BLOCK, AND MAJORLY WE ARE USING THE BLOCK HEADER
@@ -267,16 +270,16 @@ pub struct Header {
     pub beacon: Beacon,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, TreeHash)]
 pub struct Beacon {
     pub slot: U64,
-    pub proposer_index: U64,
+    pub proposer_index: u64,
     pub parent_root: B256,
     pub state_root: B256,
     pub body_root: B256,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, TreeHash)]
 pub struct SyncCommittee {
     pub pub_keys: Vec<B256>,
     pub aggregate_pubkey: B256,
@@ -335,3 +338,5 @@ pub static MAINNET_BOOTNODES : [&str; 4] = [
     "enode://2b252ab6a1d0f971d9722cb839a42cb81db019ba44c08754628ab4a823487071b5695317c8ccd085219c3a03af063495b2f1da8d18218da2d6a82981b45e6ffc@65.108.70.101:30303",   // bootnode-hetzner-hel
     "enode://4aeb4ab6c14b23e2c4cfdce879c04b0748a20d8e9b59e25ded2a08143e265c6c25936e74cbc8e641e3312ca288673d91f2f93f8e277de3cfa444ecdaaf982052@157.90.35.166:30303",   // bootnode-hetzner-fsn
 ];
+
+

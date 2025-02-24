@@ -154,19 +154,15 @@ pub fn benchmark_get_numbers(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("number_fetch");
     group.sample_size(10);
-    group.measurement_time(Duration::from_secs(50));
+ 
 
-    // USDC contract address for testing
-    let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
 
-    group.bench_function("get_2000_logs", |b| {
+    group.bench_function("get_numbers", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let s = node
                     .rpc
-                    .get_logs(20_000_000, 20_002_000, address, None)
-                    .await
-                    .unwrap();
+                    .get_block_number().await;
                 s
             })
         });
@@ -177,7 +173,7 @@ pub fn benchmark_get_numbers(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    benchmark_sync_blocks,
+    benchmark_get_numbers,
     // benchmark_get_logs,
     // benchmark_get_tx_numbers
 );

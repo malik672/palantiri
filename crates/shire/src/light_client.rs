@@ -253,7 +253,6 @@ impl LightClientSyncer {
         trusted_block_root: B256,
     ) -> Result<(), ConsensusError> {
         let bootstrap = self.get_bootstrap(trusted_block_root).await?;
-
         self.store = Some(LightClientStore {
             finalized_header: bootstrap.header.beacon.clone(),
             optimistic_header: bootstrap.header.beacon.clone(),
@@ -332,7 +331,7 @@ mod tests {
     async fn test_sync() {
         let a = LightClientSyncer::new(vec!["https://eth-beacon-chain.drpc.org/rest/".to_string()]);
         // println!("{:?}", a.get_latest_finality_update().await);
-        println!("{:?}", a.get_latest_update(1, 1).await);
+        println!("{:?}", a.get_latest_update(0, 10).await);
         // println!("{:?}", a.get_optimistic_update().await);
     }
 }

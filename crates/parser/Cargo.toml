@@ -9,3 +9,5 @@ alloy.workspace = true
 alloy-primitives.workspace = true
 serde.workspace = true
 memchr.workspace = true
+tree_hash_derive.workspace = true
+tree_hash.workspace = true

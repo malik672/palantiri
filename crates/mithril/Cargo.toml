@@ -1,0 +1,10 @@
+[package]
+name = "mithril"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parser = { path = "../parser" }
+sha2.workspace = true
+tree_hash.workspace = true
+alloy-primitives.workspace = true

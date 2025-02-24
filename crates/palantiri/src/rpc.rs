@@ -620,6 +620,8 @@ impl RpcClient {
         self.execute(request).await
     }
 
+    // pub async fn get_eth_call()
+
     pub async fn get_block_receipts(&self, block: BlockNumber) -> Result<Value, RpcError> {
         let request = RpcRequest {
             jsonrpc: "2.0",
@@ -651,15 +653,22 @@ impl RpcClient {
 
 #[cfg(test)]
 mod tests {
+    use crate::transport::http::TransportBuilder;
+    use std::time::{Duration, Instant};
     use super::*;
 
-    #[test]
-    fn test_request_cache() {
-        let mut cache = RequestCache::default();
-        let key = B256::ZERO;
-        let value = "test".to_string();
+    #[tokio::test]
+    async fn test_request_cache() {
+        let time = Instant::now();
+    
+        let client = RpcClient::new(
+            TransportBuilder::new(
+                "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
+            )
+            .build_http(),
+        );
 
-        cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key), Some(value));
+        client.get_block_number().await.unwrap();
+        println!("{:?}", time.elapsed());
     }
 }

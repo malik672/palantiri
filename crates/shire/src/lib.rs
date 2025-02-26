@@ -1,6 +1,5 @@
 #![feature(trivial_bounds)]
 
-
 use serde::{Deserialize, Serialize};
 
 pub mod checkpoint;
@@ -101,7 +100,7 @@ impl Default for NetworkForks {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum Network {
     Mainnet,
     Holesky,

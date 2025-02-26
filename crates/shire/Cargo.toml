@@ -20,4 +20,7 @@ futures.workspace = true
 reqwest.workspace = true
 tree_hash.workspace = true
 tree_hash_derive.workspace = true
+retri.workspace = true
+serde_yaml.workspace = true
+eyre.workspace = true
 

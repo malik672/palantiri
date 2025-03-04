@@ -5,8 +5,6 @@ use std::str::FromStr;
 use alloy::primitives::{Address, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 use tree_hash_derive::TreeHash;
-use tree_hash::{TreeHash, Hash256};
-
 
 //THIS IS A SCOPE TO TRACK THE HASH OF A BLOCK USING THE BLOCK NUMBER
 //SINCE THE BLOCK HEADER DOES NOT CONTAIN THE HASH OF THE BLOCK, AND MAJORLY WE ARE USING THE BLOCK HEADER
@@ -75,10 +73,6 @@ pub struct BlockHeader {
     #[serde(rename = "blobsHash")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blobs_hash: Option<B256>,
-
-    // Altair additions(Altair is a fork of the Ethereum 2.0 beacon chai: this is funny ngl(personal reason))
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sync_aggregate: Option<SyncAggregate>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -249,23 +243,7 @@ where
 
 /// ********** BEACON OF GONDOR ********** ///
 
-/// Isssues
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SyncAggregate {
-    pub sync_committee_bits: Vec<u8>,
-    pub sync_committee_signature: Vec<B256>,
-}
-
-#[derive(Debug, Default)]
-pub struct LightClientBootstrap<'a> {
-    pub version: &'a str,
-    pub header: Header,
-    pub current_sync_committee: SyncCommittee,
-    pub current_sync_committee_branch: Vec<B256>,
-    pub code: Option<u16>,
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Header {
     pub beacon: Beacon,
 }
@@ -277,6 +255,26 @@ pub struct Beacon {
     pub parent_root: B256,
     pub state_root: B256,
     pub body_root: B256,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Execution {
+    pub parent_hash: B256,
+    pub fee_recipient: Address,
+    pub state_root: B256,
+    pub receipts_root: B256,
+    pub logs_bloom: String,
+    pub prev_randao: B256,
+    pub block_number: U64,
+    pub gas_limit: U256,
+    pub gas_used: U256,
+    pub timestamp: U64,
+    pub extra_data: String,
+    pub base_fee_per_gas: U256,
+    pub excess_blob_gas: U64,
+    pub block_hash: B256,   
+    pub transactions_root: B256,
+    pub withdrawals_root: B256,
 }
 
 #[derive(Debug, Default, Clone, TreeHash)]
@@ -318,7 +316,7 @@ pub struct LightClientFinalityUpdate {
 pub struct LightClientOptimisticUpdate {
     pub attested_header: LightClientHeader,
     pub sync_aggregate: SyncAggregate,
-    pub signature_slot: U64,
+    pub signature_slot: U64, 
 }
 
 #[derive(Debug, Default)]
@@ -331,6 +329,64 @@ pub struct LightClientStore {
     pub previous_max_active_participants: U64,
     pub current_max_active_participants: U64,
 }
+
+
+#[derive(Debug, Default, Clone)]
+pub struct FinalityUpdate {
+    pub version: String,
+    pub attested_header: Beacon,
+    pub finalized_header: Beacon,
+    pub execution_branch: Vec<B256>,
+    pub execution: Execution,
+    pub finality_branch: Vec<B256>,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+    pub code: Option<u16>,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SyncAggregate {
+    pub sync_committee_bits: B256,
+    pub sync_committee_signature: B256,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Updates {
+    pub version: String,
+    pub attested_header: Beacon,
+    pub execution_branch: Vec<B256>,
+    pub execution: Execution,
+    pub next_sync_committee_branch: Vec<B256>,
+    pub next_sync_committee: SyncCommittee,
+    pub finalized_header: Beacon,
+    pub finality_branch: Vec<B256>,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+    pub code: Option<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LightOptimisticUpdate {
+    pub version: String,
+    pub execution_branch: Vec<B256>,
+    pub execution: Execution,
+    pub attested_header: Beacon,
+    pub sync_aggregate: SyncAggregate,
+    pub signature_slot: U64,
+    pub code: Option<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LightClientBootstrap {
+    pub version: String,
+    pub header: Header,
+    pub execution_branch: Vec<B256>,
+    pub execution: Execution,
+    pub current_sync_committee: SyncCommittee,
+    pub current_sync_committee_branch: Vec<B256>,
+    pub code: Option<u16>,
+}
+
 
 pub static MAINNET_BOOTNODES : [&str; 4] = [
     "enode://d860a01f9722d78051619d1e2351aba3f43f943f6f00718d1b9baa4101932a1f5011f16bb2b1bb35db20d6fe28fa0bf09636d26a87d31de9ec6203eeedb1f666@18.138.108.67:30303",   // bootnode-aws-ap-southeast-1-001

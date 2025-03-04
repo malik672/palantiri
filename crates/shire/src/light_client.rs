@@ -1,20 +1,11 @@
 use std::time::Duration;
 
 use alloy_primitives::B256;
-use futures::future::join_all;
 use mordor::{SlotSynchronizer, SLOTS_PER_PERIOD};
-use parser::{
-    beacon::{
-        light_client_bootstrap::LightClientBootstrap,
-        light_client_update::Updates,
-        light_finality_update::{self, FinalityUpdate},
-        light_optimistic_update::LightOptimisticUpdate,
-    },
-    types::{Beacon, LightClientOptimisticUpdate, LightClientUpdate, SyncCommittee},
+use parser::types::{
+    Beacon, FinalityUpdate, LightClientBootstrap, LightOptimisticUpdate, SyncCommittee, Updates,
 };
 use reqwest::Client;
-use thiserror::Error;
-use tokio::task;
 
 use crate::concensus::ConsensusError;
 
@@ -331,7 +322,7 @@ mod tests {
     async fn test_sync() {
         let a = LightClientSyncer::new(vec!["https://eth-beacon-chain.drpc.org/rest/".to_string()]);
         // println!("{:?}", a.get_latest_finality_update().await);
-        println!("{:?}", a.get_latest_update(0, 10).await);
-        // println!("{:?}", a.get_optimistic_update().await);
+        // println!("{:?}", a.get_latest_update(0, 10).await);
+        println!("{:?}", a.get_optimistic_update().await);
     }
 }

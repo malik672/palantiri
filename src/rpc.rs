@@ -114,7 +114,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -133,7 +133,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -152,7 +152,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -173,7 +173,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -212,7 +212,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response: Vec<u8> = self.execute_raw(request).await?;
+        let response: Vec<u8> = self.execute_raw(&request).await?;
 
         if let Some(raw_response) = RawJsonResponse::parse(&response) {
             let log_count = raw_response.data[raw_response.result_start..raw_response.result_end]
@@ -243,7 +243,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response_bytes = self.execute_raw(request).await?;
+        let response_bytes = self.execute_raw(&request).await?;
 
         match parse_transaction(&response_bytes) {
             Some(tx) => Ok(Some(tx)),
@@ -270,7 +270,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response_bytes = self.execute_raw(request).await?;
+        let response_bytes = self.execute_raw(&request).await?;
 
         match parse_transaction(&response_bytes) {
             Some(tx) => Ok(Some(tx)),
@@ -291,7 +291,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response_bytes: Vec<u8> = self.execute_raw(request).await?;
+        let response_bytes: Vec<u8> = self.execute_raw(&request).await?;
 
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
@@ -381,7 +381,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -400,7 +400,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -424,7 +424,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -447,7 +447,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
 
         match Generic::parse(&response) {
             Some(generic) => {
@@ -472,7 +472,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
         match Generic::parse(&response) {
             Some(generic) => {
                 let bytes = &response[generic.result_start.0..generic.result_start.1];
@@ -490,7 +490,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
         match Generic::parse(&response) {
             Some(generic) => {
                 let bytes = &response[generic.result_start.0..generic.result_start.1];
@@ -508,7 +508,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
         match Generic::parse(&response) {
             Some(generic) => {
                 let bytes = &response[generic.result_start.0..generic.result_start.1];
@@ -526,7 +526,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
         if let Some(raw_response) = RawJsonResponse::parse(&response) {
             let mut logs = Vec::new();
             for raw_log in raw_response.logs() {
@@ -546,7 +546,7 @@ impl RpcClient {
             id: 1,
         };
 
-        let response = self.execute_raw(request).await?;
+        let response = self.execute_raw(&request).await?;
         match Generic::parse(&response) {
             Some(generic) => {
                 let bytes = &response[generic.result_start.0..generic.result_start.1];
@@ -632,10 +632,10 @@ impl RpcClient {
         self.execute(request).await
     }
 
-    pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
+    pub async fn execute_raw(&self, request: &RpcRequest) -> Result<Vec<u8>, RpcError> {
         let response = self
             .transport
-            .execute_raw(serde_json::to_string(&request).expect("convert to string"))
+            .execute_raw(serde_json::to_string(request).expect("convert to string"))
             .await?;
 
         Ok(response)

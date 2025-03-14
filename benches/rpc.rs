@@ -177,6 +177,6 @@ criterion_group!(
     benches,
     benchmark_get_numbers,
     // benchmark_get_logs,
-    // benchmark_get_tx_numbers
+    benchmark_get_tx_numbers
 );
 criterion_main!(benches);

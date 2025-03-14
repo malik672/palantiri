@@ -8,6 +8,7 @@ A high-performance Ethereum RPC client with zero-copy parsing for maximum effici
 -   **Connection Pooling**: Reuse connections for faster requests.
 -   **Concurrent Batch Requests**: Handle multiple requests simultaneously.
 -   **High Throughput**: Processes 2300+ blocks/second.
+-   **Zero I/O bottleneck**
 
 ----------
 

@@ -1,0 +1,28 @@
+[package]
+name = "palantiri"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parser = { path = "../parser" }
+mordor = { path = "../mordor" }
+alloy.workspace = true
+alloy-primitives.workspace = true
+async-trait.workspace = true
+memchr.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+lru.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+log.workspace = true
+futures.workspace = true
+criterion.workspace = true
+rlp.workspace = true
+dotenv.workspace = true
+
+[[bench]]
+name="rpc"
+harness = false
+

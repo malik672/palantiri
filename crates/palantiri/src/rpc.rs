@@ -460,6 +460,17 @@ impl RpcClient {
         }
     }
 
+    /// Estimates the gas required to execute a transaction
+    ///
+    /// This function sends an eth_estimateGas request to an Ethereum node to calculate
+    /// the amount of gas needed to execute the given transaction.
+    ///
+    /// # Arguments
+    /// * `tx` - The transaction request details
+    /// * `block` - Optional block number to simulate the transaction against
+    ///
+    /// # Returns
+    /// * `Result<U256, RpcError>` - The estimated gas as a U256 value, 0(default for error)
     pub async fn estimate_gas(
         &self,
         tx: &TransactionRequest,
@@ -478,7 +489,7 @@ impl RpcClient {
                 let bytes = &response[generic.result_start.0..generic.result_start.1];
                 Ok(hex_to_u256(&bytes[2..]))
             }
-            None => Err(RpcError::Response("Failed to estimate gas".into())),
+            None => Ok(U256::ZERO),
         }
     }
 
@@ -653,14 +664,16 @@ impl RpcClient {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::address;
+
+    use super::*;
     use crate::transport::http::TransportBuilder;
     use std::time::{Duration, Instant};
-    use super::*;
 
     #[tokio::test]
     async fn test_request_cache() {
         let time = Instant::now();
-    
+
         let client = RpcClient::new(
             TransportBuilder::new(
                 "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
@@ -668,7 +681,17 @@ mod tests {
             .build_http(),
         );
 
-        client.get_block_number().await.unwrap();
+        let tx: TransactionRequest = TransactionRequest {
+            from: Some(address!("8f54C8c2df62c94772ac14CcFc85603742976312")),
+            to: Some(address!("44aa93095d6749a706051658b970b941c72c1d53")),
+            gas: None,
+            gas_price: Some(U256::from(26112348709 as u64)),
+            value: None,
+            data: Some("0xdd9c5f960000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000000000000000000000000000056bc75e2d631000000000000000000000000000000b3f868e0be5597d5db7feb59e1cadbb0fdda50a000000000000000000000000000000000000000000000001e1291b1bf0494000000000000000000000000000000000000000000000000001de460b131125fe970000000000000000000000008f54c8c2df62c94772ac14ccfc856037429763120000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000e0020d500B1d8E8eF31E21C99d1Db9A6444d3ADf12700215550133C4F0043E2e988b3c2e9C77e2C670eFe709Bfe30185CD07Ea01423b1E937929B44E4Ad8c40BbB5E7100ffff0186f1d8390222A3691C28938eC7404A1661E618e00185CD07Ea01423b1E937929B44E4Ad8c40BbB5E7100017ceB23fD6bC0adD59E62ac25578270cFf1b9f619026aaa010312692E9cADD3dDaaCE2E112A4e36397bd2f18a0085CD07Ea01423b1E937929B44E4Ad8c40BbB5E7100ffff01Ff5713FdbAD797b81539b5F9766859d4E050a6CC0085CD07Ea01423b1E937929B44E4Ad8c40BbB5E7100".to_string()),
+            nonce: None,
+        };
+
+        let x = client.estimate_gas(&tx, None).await.unwrap();
         println!("{:?}", time.elapsed());
     }
 }

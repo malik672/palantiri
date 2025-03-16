@@ -184,11 +184,6 @@ impl Node {
     /// # Returns
     /// - Result<(), NodeError>: Ok(()) on success, NodeError on failure
     ///
-    /// # Example
-    /// ```no_run
-    /// let node = Node::new(consensus, rpc);
-    /// node.watch_new_blocks().await?;
-    /// ```
     pub async fn watch_new_blocks(&self) -> Result<(), NodeError> {
         let time = SlotSynchronizer::default();
         let mut block_slot_difference: U64 = U64::from(10787043);

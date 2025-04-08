@@ -3,10 +3,9 @@ use reqwest::Client;
 use rpc::Transport;
 use std::time::Duration;
 
-pub mod libp2p;
-pub mod node;
 pub mod rpc;
 pub mod transport;
+pub mod parser;
 use dotenv;
 use std::env;
 

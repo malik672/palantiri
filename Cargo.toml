@@ -3,6 +3,12 @@
 name = "palantiri"
 version = "0.1.0"
 edition = "2021"
+authors = ["Malik <Aremumalik05@gmail.com>"]
+description = "RPC client"
+license = "MIT"
+repository = "https://github.com/malik672/palantiri"
+readme = "README.md"
+keywords = ["Ethereum", "rpc"]
 
 [dependencies]
 alloy = "0.13.0"

@@ -12,12 +12,12 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
-use parser::block_parser::parse_block;
-use parser::parser_for_small_response::Generic;
-use parser::tx_parser::parse_transaction;
-use parser::{
+use crate::parser::block_parser::parse_block;
+use crate::parser::parser_for_small_response::Generic;
+use crate::parser::tx_parser::parse_transaction;
+use crate::parser::{
     types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
-    {hex_to_b256, hex_to_u256, hex_to_u64},
+    lib::{hex_to_b256, hex_to_u256, hex_to_u64},
 };
 
 use super::*;
@@ -664,11 +664,11 @@ impl RpcClient {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::address;
+    use alloy::primitives::address;
 
     use super::*;
     use crate::transport::http::TransportBuilder;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     #[tokio::test]
     async fn test_request_cache() {

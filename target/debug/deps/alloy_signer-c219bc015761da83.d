@@ -1,0 +1,9 @@
+/Users/malik/Desktop/mc2/palantiri/target/debug/deps/liballoy_signer-c219bc015761da83.rmeta: /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/error.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/signer.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/utils.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/../README.md
+
+/Users/malik/Desktop/mc2/palantiri/target/debug/deps/alloy_signer-c219bc015761da83.d: /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/error.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/signer.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/utils.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/../README.md
+
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/lib.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/error.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/signer.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/utils.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alloy-signer-0.13.0/src/../README.md:

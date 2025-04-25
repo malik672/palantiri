@@ -278,8 +278,23 @@ impl RpcClient {
         }
     }
 
-    /// fethces the block by number
-    pub async fn get_block_by_number(
+    /// Retrieves an Ethereum block by its number.
+    ///
+    /// Sends an `eth_getBlockByNumber` JSON-RPC request to fetch the block corresponding to the specified number. Returns the block if found, or `None` if the block does not exist.
+    ///
+    /// # Parameters
+    /// - `number`: The block number to retrieve.
+    /// - `full_tx`: If `true`, includes full transaction objects; if `false`, includes only transaction hashes.
+    ///
+    /// # Returns
+    /// An `Option<Block>` containing the block if found, or `None` if not found.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let block = client.get_block_by_number(1234567, false).await.unwrap();
+    /// assert!(block.is_some());
+    /// ```    pub async fn get_block_by_number(
         &self,
         number: u64,
         full_tx: bool,
@@ -644,6 +659,19 @@ impl RpcClient {
         self.execute(request).await
     }
 
+    /// Sends a JSON-RPC request and returns the raw byte response.
+    ///
+    /// Serializes the given `RpcRequest` to a JSON string, sends it using the underlying transport, and returns the raw response bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::{RpcClient, RpcRequest};
+    /// # async fn example(client: RpcClient, request: RpcRequest) {
+    /// let response = client.execute_raw(request).await.unwrap();
+    /// assert!(!response.is_empty());
+    /// # }
+    /// ```
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
         let response = self
             .transport
@@ -653,6 +681,25 @@ impl RpcClient {
         Ok(response)
     }
 
+    /// Sends a JSON-RPC request and deserializes the response into the specified type.
+    ///
+    /// Serializes the given `RpcRequest`, sends it using the transport, and attempts to parse the JSON response into type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `RpcError::Parse` if the response cannot be deserialized into the expected type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let request = RpcRequest {
+    ///     jsonrpc: "2.0",
+    ///     method: "eth_chainId",
+    ///     params: serde_json::json!([]),
+    ///     id: 1,
+    /// };
+    /// let chain_id: U64 = client.execute(request).await.unwrap();
+    /// ```
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
         let response = self
             .transport
@@ -673,6 +720,37 @@ mod tests {
     use std::time::Instant;
 
     #[tokio::test]
+    /// Asynchronously tests the gas estimation and request caching functionality of the `RpcClient`.
+    ///
+    /// This test constructs a sample transaction, sends an `eth_estimateGas` request to a mainnet Ethereum node,
+    /// and prints the elapsed time along with the estimated gas value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # tokio_test::block_on(async {
+    /// async fn test_request_cache() {
+    ///     let time = std::time::Instant::now();
+    ///     let client = RpcClient::new(
+    ///         TransportBuilder::new(
+    ///             "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
+    ///         )
+    ///         .build_http(),
+    ///     );
+    ///     let tx: TransactionRequest = TransactionRequest {
+    ///         from: Some(address!("8f54C8c2df62c94772ac14CcFc85603742976312")),
+    ///         to: Some(address!("44aa93095d6749a706051658b970b941c72c1d53")),
+    ///         gas: None,
+    ///         gas_price: Some(U256::from(26112348709u64)),
+    ///         value: None,
+    ///         data: Some("0xdd9c5f96...".to_string()),
+    ///         nonce: None,
+    ///     };
+    ///     let x = client.estimate_gas(&tx, None).await.unwrap();
+    ///     println!("{:?}{:?}", time.elapsed(), x);
+    /// }
+    /// # });
+    /// ```
     async fn test_request_cache() {
         let time = Instant::now();
 

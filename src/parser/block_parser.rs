@@ -33,6 +33,36 @@ pub struct RawJsonResponse<'a> {
 }
 
 impl<'a> RawBlock<'a> {
+    /// Parses raw JSON bytes representing an Ethereum block and extracts byte ranges for all required block fields.
+    ///
+    /// Returns `Some(RawBlock)` if all mandatory fields and arrays are found; returns `None` if any required field is missing or the input is malformed. The `base_fee_per_gas` field is parsed as optional.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let json = br#"{
+    ///     "number":"0x1",
+    ///     "hash":"0xabc",
+    ///     "parentHash":"0xdef",
+    ///     "sha3Uncles":"0x123",
+    ///     "miner":"0x456",
+    ///     "stateRoot":"0x789",
+    ///     "transactionsRoot":"0x101",
+    ///     "receiptsRoot":"0x112",
+    ///     "logsBloom":"0x131",
+    ///     "difficulty":"0x415",
+    ///     "gasLimit":"0x161",
+    ///     "gasUsed":"0x718",
+    ///     "timestamp":"0x192",
+    ///     "extraData":"0xabc",
+    ///     "mixHash":"0xdef",
+    ///     "nonce":"0x123",
+    ///     "transactions":[],
+    ///     "uncles":[]
+    /// }"#;
+    /// let raw_block = RawBlock::parse(json);
+    /// assert!(raw_block.is_some());
+    /// ```
     pub fn parse(input: &'a [u8]) -> Option<Self> {
         Some(Self {
             data: input,
@@ -59,6 +89,17 @@ impl<'a> RawBlock<'a> {
     }
 
     #[inline]
+    /// Converts the raw block data into a fully typed `Block` struct.
+    ///
+    /// Extracts and decodes all block fields from the referenced byte ranges, including optional fields such as `base_fee_per_gas`. Returns a `Block` with all fields populated from the raw JSON data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let raw_block = RawBlock::parse(json_bytes).unwrap();
+    /// let block = raw_block.to_block();
+    /// assert_eq!(block.number, 1234567);
+    /// ```
     pub fn to_block(&self) -> Block {
         Block {
             number: hex_to_u64(&self.data[self.number.0..self.number.1]),
@@ -179,11 +220,34 @@ impl<'a> RawJsonResponse<'a> {
     }
 
     #[inline]
+    /// Parses the `"result"` JSON object into a `RawBlock`.
+    ///
+    /// Returns `Some(RawBlock)` if the block data is present and successfully parsed, or `None` if parsing fails or required fields are missing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let json = br#"{"jsonrpc":"2.0","result":{"number":"0x1","hash":"0xabc", ... }, "id":1}"#;
+    /// let response = RawJsonResponse::parse_block(json).unwrap();
+    /// let raw_block = response.block();
+    /// assert!(raw_block.is_some());
+    /// ```
     pub fn block(&self) -> Option<RawBlock<'a>> {
        RawBlock::parse(&self.data[self.result_start..=self.result_end])
     }
 }
 
+/// Parses raw JSON bytes representing an Ethereum block and returns a fully typed `Block`.
+///
+/// Returns `None` if the input does not contain a valid block or required fields are missing.
+///
+/// # Examples
+///
+/// ```
+/// let json = br#"{"jsonrpc":"2.0","id":1,"result":{"number":"0x1","hash":"0xabc...","parentHash":"0xdef...","transactions":[],"uncles":[]}}"#;
+/// let block = parse_block(json);
+/// assert!(block.is_some());
+/// ```
 pub fn parse_block(input: &[u8]) -> Option<Block> {
  RawJsonResponse::parse_block(input)
         .and_then(|r| r.block(), )

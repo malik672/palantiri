@@ -17,6 +17,16 @@ pub struct TransportBuilder {
 }
 
 impl TransportBuilder {
+    /// Creates a new `TransportBuilder` with the specified URL and default configuration values.
+    ///
+    /// The default timeout is 10 seconds, the maximum number of retries is 3, and the maximum number of idle connections in the pool is 32.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = TransportBuilder::new("http://localhost:8080".to_string());
+    /// assert_eq!(builder.max_retries, 3);
+    /// ```
     pub fn new(url: String) -> Self {
         Self {
             url,

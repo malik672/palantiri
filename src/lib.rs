@@ -28,6 +28,15 @@ pub enum RpcError {
 }
 
 impl HttpTransport {
+    /// Creates a new `HttpTransport` with a single URL and a preconfigured HTTP client.
+    ///
+    /// The client is initialized with a 10-second timeout, 10-second pool idle timeout, and 60-second TCP keepalive. Panics if the HTTP client cannot be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let transport = HttpTransport::new("https://example.com/api".to_string());
+    /// ```
     pub fn new(url: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
@@ -45,6 +54,21 @@ impl HttpTransport {
         }
     }
 
+    /// Creates a new `HttpTransport` instance using environment variables for configuration.
+    ///
+    /// Loads the primary URL from the `PRIMARY_URL` environment variable (required), optional fallback URLs from `FALLBACK_URL_1` and `FALLBACK_URL_2`, and the transport timeout from `TRANSPORT_TIMEOUT` (defaults to 10 seconds if unset). Initializes the HTTP client with these settings.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `PRIMARY_URL` is not set or if the HTTP client cannot be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// std::env::set_var("PRIMARY_URL", "https://example.com/api");
+    /// let transport = HttpTransport::new_from_env();
+    /// assert_eq!(transport.urls[0], "https://example.com/api");
+    /// ```
     pub fn new_from_env() -> Self {
         dotenv::dotenv().ok();
 

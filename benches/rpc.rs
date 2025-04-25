@@ -66,7 +66,16 @@ use alloy::providers::{Provider, ProviderBuilder};
 //     });
 
 //     group.finish();
-// }
+/// Benchmarks the performance of fetching Ethereum logs over a 1,000-block range using the Palantiri RPC client.
+///
+/// This function measures the time taken to retrieve logs for a specific contract address between blocks 20,000,000 and 20,001,000 from the Ethereum mainnet via Infura. The benchmark is configured with a sample size of 10 and a measurement duration of 50 seconds.
+///
+/// # Examples
+///
+/// ```
+/// use criterion::Criterion;
+/// benchmark_get_logs(&mut Criterion::default());
+/// ```
 
 pub fn benchmark_get_logs(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -137,7 +146,16 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
 //     });
 
 //     group.finish();
-// }
+/// Benchmarks the performance of fetching the latest Ethereum block number using the Palantiri RPC client.
+///
+/// This function measures how quickly the Palantiri RPC client retrieves the most recent block number from the Ethereum mainnet via an Infura HTTP endpoint. The benchmark is grouped under "number_fetch" with a sample size of 10.
+///
+/// # Examples
+///
+/// ```
+/// use criterion::Criterion;
+/// benchmark_get_numbers(&mut Criterion::default());
+/// ```
 
 pub fn benchmark_get_numbers(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -169,6 +187,16 @@ pub fn benchmark_get_numbers(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmarks the performance of estimating gas for a specific Ethereum transaction using the Palantiri RPC client.
+///
+/// This function measures how quickly the RPC client can estimate gas for a hardcoded transaction request on Ethereum mainnet via Infura, using Criterion for benchmarking.
+///
+/// # Examples
+///
+/// ```
+/// use criterion::Criterion;
+/// benchmark_estimate_gas(&mut Criterion::default());
+/// ```
 pub fn benchmark_estimate_gas(c: &mut Criterion) {
 
     let tx: TransactionRequest = TransactionRequest {
@@ -214,6 +242,18 @@ pub fn benchmark_estimate_gas(c: &mut Criterion) {
 
 
 
+/// Benchmarks fetching a specific Ethereum block by number using the Alloy provider.
+///
+/// This function measures the performance of retrieving block 10,000 from the Ethereum mainnet
+/// via an HTTP provider built with Alloy's `ProviderBuilder`. The benchmark runs asynchronously
+/// on a Tokio runtime, using Criterion for timing and sample collection.
+///
+/// # Examples
+///
+/// ```
+/// use criterion::Criterion;
+/// benchmark_number(&mut Criterion::default());
+/// ```
 pub fn benchmark_number(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let rpc_url = "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".parse().unwrap();
@@ -235,6 +275,19 @@ pub fn benchmark_number(c: &mut Criterion) {
  
 }
 
+/// Benchmarks fetching a specific Ethereum block with full transaction data using the Palantiri RPC client.
+///
+/// This function measures the performance of retrieving block number 10,000 from the Ethereum mainnet,
+/// including all transaction objects, via the Palantiri client over HTTP. The benchmark is configured
+/// with a sample size of 100 and a measurement duration of 44 seconds.
+///
+/// # Examples
+///
+/// ```
+/// use criterion::Criterion;
+/// benchmark_get_block_numbers(&mut Criterion::default());
+/// ```
+pub fn benchmark_get_block_numbers(c: &mut Criterion) {
 pub fn benchmark_get_block_numbers(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 

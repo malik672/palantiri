@@ -30,8 +30,9 @@ pub enum RpcError {
 impl HttpTransport {
     pub fn new(url: String) -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .pool_idle_timeout(Duration::from_secs(60))
+            .timeout(Duration::from_secs(10))
+            .pool_idle_timeout(Duration::from_secs(10))
+            // .http2_prior_knowledge()
             .tcp_keepalive(Duration::from_secs(60))
             .build()
             .expect("Failed to create HTTP client");
@@ -40,7 +41,7 @@ impl HttpTransport {
             client,
             urls: vec![url],
             current_url: 0,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(10),
         }
     }
 
@@ -58,14 +59,14 @@ impl HttpTransport {
         }
 
         let transport_timeout = env::var("TRANSPORT_TIMEOUT")
-            .unwrap_or_else(|_| "30".to_string())
+            .unwrap_or_else(|_| "10".to_string())
             .parse()
-            .unwrap_or(30);
+            .unwrap_or(10);
 
         let client = Client::builder()
             .timeout(Duration::from_secs(transport_timeout))
-            .pool_idle_timeout(Duration::from_secs(60))
-            .tcp_keepalive(Duration::from_secs(60))
+            .pool_idle_timeout(Duration::from_secs(10))
+            .tcp_keepalive(Duration::from_secs(10))
             .build()
             .expect("Failed to create HTTP client");
 

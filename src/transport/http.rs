@@ -20,7 +20,7 @@ impl TransportBuilder {
     pub fn new(url: String) -> Self {
         Self {
             url,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(10),
             max_retries: 3,
             pool_max_idle: 32,
         }

@@ -4,14 +4,14 @@ use ::palantiri::{
     rpc::RpcClient,
     transport::http::TransportBuilder,
 };
-use alloy::primitives::{address, Address, U256};
+use alloy::{eips::BlockNumberOrTag, primitives::{address, U256}};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
-use palantiri::parser::{lib::hex_to_b256, types::{BlockHeader, TransactionRequest}};
+use palantiri::parser::types::TransactionRequest;
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
-use alloy::{hex, primitives::B256};
+use alloy::providers::{Provider, ProviderBuilder};
 
 // pub fn benchmark_sync_blocks(c: &mut Criterion) {
 //     let rt = Runtime::new().unwrap();
@@ -68,40 +68,39 @@ use alloy::{hex, primitives::B256};
 //     group.finish();
 // }
 
-// pub fn benchmark_get_logs(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
+pub fn benchmark_get_logs(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
 
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
-//         )
-//         .build_http(),
-//     );
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http(),
+    );
 
-//     let node = Arc::new(Node::new(Arc::new(rpc)));
+    let node = Arc::new(rpc);
 
-//     let mut group = c.benchmark_group("log_fetch");
-//     group.sample_size(10);
-//     group.measurement_time(Duration::from_secs(50));
+    let mut group = c.benchmark_group("log_fetch");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(50));
 
-//     // USDC contract address for testing
-//     let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
+    // USDC contract address for testing
+    let address = Some(address!("1F98431c8aD98523631AE4a59f267346ea31F984"));
 
-//     group.bench_function("get_2000_logs", |b| {
-//         b.iter(|| {
-//             rt.block_on(async {
-//                 let s = node
-//                     .rpc
-//                     .get_logs(20_000_000, 20_001_000, address, None)
-//                     .await
-//                     .unwrap();
-//                 s
-//             })
-//         });
-//     });
+    group.bench_function("get_2000_logs", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = node
+                    .get_logs(20_000_000, 20_001_000, address, None)
+                    .await
+                    .unwrap();
+                s
+            })
+        });
+    });
 
-//     group.finish();
-// }
+    group.finish();
+}
 
 // pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
 //     let rt = Runtime::new().unwrap();
@@ -140,36 +139,35 @@ use alloy::{hex, primitives::B256};
 //     group.finish();
 // }
 
-// pub fn benchmark_get_numbers(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
+pub fn benchmark_get_numbers(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
 
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
-//         )
-//         .build_http(),
-//     );
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http(),
+    );
 
-//     let node = Arc::new(Node::new(Arc::new(rpc)));
+    let node = Arc::new(rpc);
 
-//     let mut group = c.benchmark_group("number_fetch");
-//     group.sample_size(10);
+    let mut group = c.benchmark_group("number_fetch");
+    group.sample_size(10);
  
 
 
-//     group.bench_function("get_numbers", |b| {
-//         b.iter(|| {
-//             rt.block_on(async {
-//                 let s = node
-//                     .rpc
-//                     .get_block_number().await;
-//                 s
-//             })
-//         });
-//     });
+    group.bench_function("get_numbers", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = node
+                    .get_block_number().await;
+                s
+            })
+        });
+    });
 
-//     group.finish();
-// }
+    group.finish();
+}
 
 pub fn benchmark_estimate_gas(c: &mut Criterion) {
 
@@ -214,10 +212,64 @@ pub fn benchmark_estimate_gas(c: &mut Criterion) {
 }
 
 
+
+
+pub fn benchmark_number(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let rpc_url = "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".parse().unwrap();
+    let provider = ProviderBuilder::new().on_http(rpc_url);
+
+    let mut group = c.benchmark_group("number_fetch");
+    group.sample_size(100);
+    group.measurement_time(std::time::Duration::from_secs(44));
+
+    group.bench_function("get_numbers", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = black_box(provider.get_block_by_number(BlockNumberOrTag::Number(10_000))).await;
+                black_box(s)
+            })
+        });
+    });
+
+ 
+}
+
+pub fn benchmark_get_block_numbers(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let rpc = RpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http(),
+    );
+
+    let node = Arc::new(rpc);
+
+    let mut group = c.benchmark_group("number_fetch");
+    group.sample_size(100);
+    group.measurement_time(std::time::Duration::from_secs(44));
+ 
+
+
+    group.bench_function("get_numbers_palantiri", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let s = black_box(node.get_block_by_number(10_000, true)).await;
+                black_box(s)
+            })
+        });
+    });
+
+    group.finish();
+}
+
+
+
 criterion_group!(
     benches,
-    benchmark_estimate_gas,
-    // benchmark_get_logs,
-    // benchmark_get_tx_numbers
+    // benchmark_number,
+    benchmark_get_block_numbers,
 );
 criterion_main!(benches);

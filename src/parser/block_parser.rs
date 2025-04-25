@@ -20,7 +20,7 @@ pub struct RawBlock<'a> {
     extra_data: (usize, usize),
     mix_hash: (usize, usize),
     nonce: (usize, usize),
-    base_fee_per_gas: (usize, usize),
+    base_fee_per_gas: Option<(usize, usize)>,
     transactions: Vec<(usize, usize)>,
     uncles: Vec<(usize, usize)>,
 }
@@ -33,7 +33,6 @@ pub struct RawJsonResponse<'a> {
 }
 
 impl<'a> RawBlock<'a> {
-    #[inline]
     pub fn parse(input: &'a [u8]) -> Option<Self> {
         Some(Self {
             data: input,
@@ -53,7 +52,7 @@ impl<'a> RawBlock<'a> {
             extra_data: find_field(input, b"\"extraData\":\"", b"\"")?,
             mix_hash: find_field(input, b"\"mixHash\":\"", b"\"")?,
             nonce: find_field(input, b"\"nonce\":\"", b"\"")?,
-            base_fee_per_gas: find_field(input, b"\"baseFeePerGas\":\"", b"\"")?,
+            base_fee_per_gas: find_field(input, b"\"baseFeePerGas\":\"", b"\""),
             transactions: Self::parse_transactions_array(input)?,
             uncles: Self::parse_uncles_array(input)?,
         })
@@ -82,9 +81,9 @@ impl<'a> RawBlock<'a> {
                 .to_string(),
             mix_hash: hex_to_b256(&self.data[self.mix_hash.0..self.mix_hash.1]),
             nonce: hex_to_u64(&self.data[self.nonce.0..self.nonce.1]),
-            base_fee_per_gas: Some(hex_to_u256(
-                &self.data[self.base_fee_per_gas.0..self.base_fee_per_gas.1],
-            )),
+            base_fee_per_gas: self.base_fee_per_gas.map(|(start, end)| 
+                hex_to_u256(&self.data[start..end])
+            ),
             prev_randao: None,
             transactions: self
                 .transactions
@@ -181,12 +180,12 @@ impl<'a> RawJsonResponse<'a> {
 
     #[inline]
     pub fn block(&self) -> Option<RawBlock<'a>> {
-        RawBlock::parse(&self.data[self.result_start..=self.result_end])
+       RawBlock::parse(&self.data[self.result_start..=self.result_end])
     }
 }
 
 pub fn parse_block(input: &[u8]) -> Option<Block> {
-    RawJsonResponse::parse_block(input)
-        .and_then(|r| r.block())
+ RawJsonResponse::parse_block(input)
+        .and_then(|r| r.block(), )
         .map(|tx| tx.to_block())
 }

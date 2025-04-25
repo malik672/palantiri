@@ -269,7 +269,7 @@ pub fn benchmark_get_block_numbers(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    benchmark_number,
+    // benchmark_number,
     benchmark_get_block_numbers,
 );
 criterion_main!(benches);

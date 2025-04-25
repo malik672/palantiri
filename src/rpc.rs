@@ -694,6 +694,6 @@ mod tests {
         };
 
         let x = client.estimate_gas(&tx, None).await.unwrap();
-        println!("{:?}", time.elapsed());
+        println!("{:?}{:?}", time.elapsed(), x);
     }
 }

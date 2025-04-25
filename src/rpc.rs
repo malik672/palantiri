@@ -293,6 +293,7 @@ impl RpcClient {
 
         let response_bytes: Vec<u8> = self.execute_raw(request).await?;
 
+
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
             None => Ok(None),
@@ -646,7 +647,7 @@ impl RpcClient {
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
         let response = self
             .transport
-            .execute_raw(serde_json::to_string(&request).expect("convert to string"))
+            .execute_raw(serde_json::to_string(&request).unwrap())
             .await?;
 
         Ok(response)
@@ -655,7 +656,8 @@ impl RpcClient {
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
         let response = self
             .transport
-            .execute(serde_json::to_string(&request).expect("convert to string"))
+            //why use unwrap here? well basically we are sure that the request is valid based on the params type tthat act as a check
+            .execute(serde_json::to_string(&request).unwrap())
             .await?;
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))

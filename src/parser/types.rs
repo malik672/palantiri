@@ -110,6 +110,7 @@ pub struct Block {
     #[serde(deserialize_with = "deserialize_optional_hex")]
     pub mix_hash: B256,
     pub nonce: U64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "baseFeePerGas")]
     pub base_fee_per_gas: Option<U256>,
     pub transactions: Vec<B256>,

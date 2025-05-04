@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::time::Duration;
 
-use crate::{HttpTransport, RpcError};
+use crate::{hyper_transport::HyperTransport, HttpTransport, RpcError};
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
@@ -43,6 +43,10 @@ impl TransportBuilder {
 
     pub fn build_http(self) -> HttpTransport {
         HttpTransport::new(self.url)
+    }
+
+    pub fn build_http_hyper(self) -> HyperTransport {
+        HyperTransport::new(self.url)
     }
 
     pub fn build_http_with_config(self, param: HttpTransport) -> HttpTransport {

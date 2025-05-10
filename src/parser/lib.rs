@@ -1,26 +1,54 @@
 use alloy::primitives::{Address, B256, U256, U64};
 
 #[inline]
-pub fn hex_to_address(hex: &[u8]) -> Address {
+pub fn unsafe_hex_to_address(hex: &[u8]) -> Address {
     let mut bytes = [0u8; 20];
-    let hex = if hex.len() >= 2 && hex[0] == b'0' && (hex[1] == b'x' || hex[1] == b'X') {
-        &hex[2..]
-    } else {
-        hex
-    };
+  
+    // Skip 0x
+    let hex_ptr = unsafe {hex.as_ptr().add(2)};
+    let out_ptr = bytes.as_mut_ptr();
+
+    unsafe {
+        for i in 0..20 {
+            let sum = i * 2;
+            let high = match *hex_ptr.add(sum) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0, 
+            };
+
+            let low = match *hex_ptr.add(sum + 1) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0, 
+            };
+
+            *out_ptr.add(i) = (high << 4) | low;
+        }
+    }
+
+    Address::from_slice(&bytes)
+}
+
+#[inline]
+pub fn unsafe_hex_to_b256(hex: &[u8]) -> B256 {
+    let mut bytes = [0u8; 32];
+
 
     let hex_ptr = hex.as_ptr();
     let out_ptr = bytes.as_mut_ptr();
 
     unsafe {
-        for i in 0..20 {
+        for i in 0..32 {
             let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
             let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
             *out_ptr.add(i) = (high << 4) | low;
         }
     }
 
-    Address::from_slice(&bytes)
+    B256::from_slice(&bytes)
 }
 
 #[inline]

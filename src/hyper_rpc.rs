@@ -12,10 +12,9 @@ use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
 use crate::parser::tx_parser::parse_transaction;
 use crate::parser::{
-    types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
     lib::{hex_to_b256, hex_to_u256, hex_to_u64},
+    types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
 };
-
 
 use super::*;
 
@@ -42,7 +41,6 @@ pub struct RpcRequest {
     pub params: serde_json::Value,
     pub id: u64,
 }
-
 
 impl RpcClient {
     pub fn new<T: Transport + 'static>(transport: T) -> Self {
@@ -237,7 +235,6 @@ impl RpcClient {
         };
 
         let response_bytes: Vec<u8> = self.execute_raw(request).await?;
-
 
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
@@ -590,17 +587,18 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        let response = self.transport.
-            hyper_execute_raw(serde_json::to_string(&request).unwrap())
+        let response = self
+            .transport
+            .hyper_execute_raw(serde_json::to_string(&request).unwrap())
             .await?;
 
         Ok(response)
     }
 
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
-        let response =
-            
-           self.transport.hyper_execute(serde_json::to_string(&request).unwrap())
+        let response = self
+            .transport
+            .hyper_execute(serde_json::to_string(&request).unwrap())
             .await?;
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
@@ -638,5 +636,19 @@ mod tests {
 
         let x = client.estimate_gas(&tx, None).await.unwrap();
         println!("{:?}{:?}", time.elapsed(), x);
+    }
+
+    #[tokio::test]
+    async fn test_get_block() {
+        let rpc = RpcClient::new(
+            TransportBuilder::new(
+                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+            )
+            .build_http_hyper(),
+
+        );
+
+
+            let x = rpc.get_block_by_number(22349461, true);
     }
 }

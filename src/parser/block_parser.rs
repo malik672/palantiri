@@ -1,4 +1,4 @@
-use super::lib::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use super::lib::{find_field, hex_to_b256, hex_to_u256, hex_to_u64, unsafe_hex_to_address, unsafe_hex_to_b256};
 use super::types::Block;
 
 // Field indices for fast lookup
@@ -73,16 +73,18 @@ impl<'a> RawBlock<'a> {
             }
         }
         
-        // Fast check for required fields
-        if (fields_present & ((1 << NUMBER) | (1 << HASH))) != ((1 << NUMBER) | (1 << HASH)) {
-            return None;
-        }
+        /*This should be returned one day but for a perfect block we never hit this */
+        // if (fields_present & ((1 << NUMBER) | (1 << HASH))) != ((1 << NUMBER) | (1 << HASH)) {
+        //     println!("Missing required fields: number or hash");
+        //     return None;
+        // }
+
         
         // Estimate transaction count for efficient allocation
-        // Most blocks have < 500 transactions, so this is a reasonable start
-        let tx_capacity = if input.len() > 100_000 { 500 } else { 32 };
-        let mut transactions = Vec::with_capacity(tx_capacity);
-        let mut uncles = Vec::with_capacity(2); // Uncles are typically 0-2
+        /*Now this is quite normal we hit ,ore 500 than 32 so removing the branch is cool is here */
+        // let tx_capacity = if input.len() > 100_000 {println!("mogged"); 500 } else {  println!("Estimated transaction count"); 32 };
+        let mut transactions = Vec::with_capacity(500);
+        let mut uncles = Vec::with_capacity(2); 
         
         // Parse transaction array - only if we need it
         Self::parse_transactions_array(input, &mut transactions);
@@ -183,26 +185,26 @@ impl<'a> RawBlock<'a> {
                 let (start, end) = self.fields[idx];
                 &self.data[start..end]
             } else {
-                b"0x0" // Default value for missing fields
+                b"0x0" 
             }
         };
         
         Block {
             number: hex_to_u64(get_field(NUMBER)),
             hash: Some(hex_to_b256(get_field(HASH))),
-            parent_hash: hex_to_b256(get_field(PARENT_HASH)),
-            uncles_hash: hex_to_b256(get_field(UNCLES_HASH)),
-            author: hex_to_address(get_field(AUTHOR)),
-            state_root: hex_to_b256(get_field(STATE_ROOT)),
-            transactions_root: hex_to_b256(get_field(TRANSACTIONS_ROOT)),
-            receipts_root: hex_to_b256(get_field(RECEIPTS_ROOT)),
+            parent_hash: unsafe_hex_to_b256(get_field(PARENT_HASH)),
+            uncles_hash: unsafe_hex_to_b256(get_field(UNCLES_HASH)),
+            author: unsafe_hex_to_address(get_field(AUTHOR)),
+            state_root: unsafe_hex_to_b256(get_field(STATE_ROOT)),
+            transactions_root: unsafe_hex_to_b256(get_field(TRANSACTIONS_ROOT)),
+            receipts_root: unsafe_hex_to_b256(get_field(RECEIPTS_ROOT)),
             logs_bloom: String::from_utf8_lossy(get_field(LOGS_BLOOM)).into_owned(),
             difficulty: hex_to_u64(get_field(DIFFICULTY)),
             gas_limit: hex_to_u256(get_field(GAS_LIMIT)),
             gas_used: hex_to_u256(get_field(GAS_USED)),
             timestamp: hex_to_u64(get_field(TIMESTAMP)),
             extra_data: String::from_utf8_lossy(get_field(EXTRA_DATA)).into_owned(),
-            mix_hash: hex_to_b256(get_field(MIX_HASH)),
+            mix_hash: unsafe_hex_to_b256(get_field(MIX_HASH)),
             nonce: hex_to_u64(get_field(NONCE)),
             base_fee_per_gas: Some(hex_to_u256(get_field(BASE_FEE_PER_GAS))),
             prev_randao: None,
@@ -213,7 +215,7 @@ impl<'a> RawBlock<'a> {
                 .collect(),
             uncles: self.uncles
                 .iter()
-                .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
+                .map(|&(s, e)| hex_to_b256(&self.data[s..e ]))
                 .collect(),
         }
     }

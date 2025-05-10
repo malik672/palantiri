@@ -5,7 +5,7 @@ use alloy::{
     primitives::{address, U256},
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use palantiri::parser::types::TransactionRequest;
+use palantiri::{hyper_rpc::RpcRequest, parser::types::TransactionRequest};
 use tokio::runtime::Runtime;
 
 use std::{sync::Arc, time::Duration};
@@ -217,8 +217,8 @@ pub fn benchmark_number(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let s =
-                    black_box(provider.get_block_by_number(BlockNumberOrTag::Number(22349461))).await;
-                black_box(s)
+                    black_box(provider.get_block_by_number(BlockNumberOrTag::Number(22395317))).await;
+                black_box(s.unwrap())
             })
         });
     });
@@ -234,18 +234,59 @@ pub fn benchmark_get_block_numbers(c: &mut Criterion) {
         .build_http_hyper(),
     );
 
-    let node = Arc::new(rpc);
-
     let mut group = c.benchmark_group("number_fetch");
     group.sample_size(100);
+    let mut no = 22423460;
     group.measurement_time(std::time::Duration::from_secs(44));
 
     group.bench_function("get_numbers_palantiri", |b| {
         b.iter(|| {
+         
             rt.block_on(async {
-                let s = black_box(node.get_block_by_number(22349461, true)).await;
+                let s = black_box(rpc.get_block_by_number(no, true)).await;
+                no = no - 1;
                 black_box(s)
             })
+       
+        });
+
+        
+    });
+
+    group.finish();
+}
+
+pub fn benchmark_execute_raw(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let rpc = HyperRpcClient::new(
+        TransportBuilder::new(
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+        )
+        .build_http_hyper(),
+    );
+
+    let mut group = c.benchmark_group("number_fetch");
+    group.sample_size(100);
+    let mut no = 22440939;
+    group.measurement_time(std::time::Duration::from_secs(44));
+
+    group.bench_function("get_execute_raw", |b| {
+        b.iter(|| {
+         
+            rt.block_on(async {
+                let request = RpcRequest {
+                    jsonrpc: "2.0",
+                    method: "eth_getBlockByNumber",
+                    params: serde_json::json!([format!("0x{:x}", no), true]),
+                    id: 1,
+                };
+        
+                let s = black_box(rpc.execute_raw(request)).await;
+                no = no - 1;
+                black_box(s)
+            })
+       
         });
 
         
@@ -257,6 +298,7 @@ pub fn benchmark_get_block_numbers(c: &mut Criterion) {
 criterion_group!(
     benches,
     // benchmark_number,
-    benchmark_get_block_numbers,
+    // benchmark_get_block_numbers,
+    benchmark_execute_raw,
 );
 criterion_main!(benches);

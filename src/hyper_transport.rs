@@ -51,7 +51,6 @@ impl Service<String> for HyperTransport {
 
 }
 
-/// Implementation of Tower's Service trait for Hyper_Execute_Raw
 impl Service<Vec<u8>> for HyperTransport {
     type Response = Vec<u8>;
     type Error = RpcError;
@@ -70,7 +69,6 @@ impl Service<Vec<u8>> for HyperTransport {
     }
 
 }
-
 
 
 impl HyperTransport {

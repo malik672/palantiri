@@ -3,7 +3,7 @@ use alloy::primitives::{Address, B256, U64};
 
 use super::types::{Log, RawJsonResponse};
 
-use super::lib::{find_field, hex_to_address, hex_to_b256, hex_to_u64};
+use super::lib::{find_field, unsafe_hex_to_address, hex_to_b256, hex_to_u64};
 
 #[derive(Debug)]
 pub struct RawLog<'a> {
@@ -142,7 +142,7 @@ impl<'a> RawLog<'a> {
     #[inline]
     pub fn address(&self) -> Address {
         let bytes = &self.data[self.address.0..self.address.1];
-        hex_to_address(&bytes[2..])
+        unsafe_hex_to_address(&bytes[2..])
     }
 
     #[inline]

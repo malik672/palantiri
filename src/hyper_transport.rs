@@ -75,6 +75,7 @@ impl Service<Vec<u8>> for HyperTransport {
 impl HyperTransport {
     pub fn new(url: String) -> Self {
         debug!("Creating new HyperTransport for URL: {}", url);
+           println!("Creating new RpcClient with transport: {:?}", transport);
 
         let http_executor = TokioExecutor::new();
 

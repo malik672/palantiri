@@ -1,1 +1,1 @@
-{"rustc":13320136379868979604,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[2462307318708793562,"build_script_build",false,4463145343954893912]],"local":[{"RerunIfEnvChanged":{"var":"ICU4X_DATA_DIR","val":null}}],"rustflags":[],"config":0,"compile_kind":0}
+{"rustc":9752066924441703846,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[2462307318708793562,"build_script_build",false,16843347487800429327]],"local":[{"RerunIfEnvChanged":{"var":"ICU4X_DATA_DIR","val":null}}],"rustflags":[],"config":0,"compile_kind":0}

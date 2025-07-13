@@ -1,11 +1,11 @@
 crate::version::Version {
-    minor: 87,
+    minor: 89,
     patch: 0,
     channel: crate::version::Channel::Nightly(
         crate::date::Date {
             year: 2025,
-            month: 2,
-            day: 16,
+            month: 5,
+            day: 23,
         },
     ),
 }

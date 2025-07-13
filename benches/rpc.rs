@@ -12,61 +12,6 @@ use std::{sync::Arc, time::Duration};
 
 use alloy::providers::{Provider, ProviderBuilder};
 
-// pub fn benchmark_sync_blocks(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
-
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
-//         )
-//         .build_http(),
-//     );
-
-//     let node = Node::new(Arc::new(rpc));
-
-//     let mut group = c.benchmark_group("sync_operations");
-
-//     let start_block = 17000000;
-//     for size in [10000].iter() {
-//         group.bench_function(format!("sync_{}_blocks", size), |b| {
-//             b.iter(|| {
-//                 rt.block_on(async {
-//                     black_box(
-//                         node.sync_block_range(start_block, start_block + size)
-//                             .await
-//                             .unwrap(),
-//                     )
-//                 })
-//             })
-//         });
-//     }
-
-//     group.finish();
-// }
-
-// pub fn benchmark_block_watching(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
-
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
-//         )
-//         .build_http(),
-//     );
-
-//     let node = Arc::new(Node::new(Arc::new(rpc)));
-
-//     let mut group = c.benchmark_group("block_sync");
-//     group.sample_size(10);
-//     group.measurement_time(Duration::from_secs(50));
-
-//     group.bench_function("sync_10_blocks", |b| {
-//         b.iter(|| rt.block_on(async { node.sync_block_range(100_000, 110_000).await.unwrap() }));
-//     });
-
-//     group.finish();
-// }
-
 pub fn benchmark_get_logs(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -101,42 +46,6 @@ pub fn benchmark_get_logs(c: &mut Criterion) {
     group.finish();
 }
 
-// pub fn benchmark_get_tx_numbers(c: &mut Criterion) {
-//     let rt = Runtime::new().unwrap();
-
-//     let rpc = RpcClient::new(
-//         TransportBuilder::new(
-//             "https://mainnet.infura.io/v3/f5fa2813a91241dbb0decd8872ee2154".to_string(),
-//         )
-//         .build_http(),
-//     );
-
-//     let node = Arc::new(Node::new(Arc::new(rpc)));
-
-//     let mut group = c.benchmark_group("log_fetch");
-//     group.sample_size(10);
-//     group.measurement_time(Duration::from_secs(50));
-
-//     group.bench_function("get_2000_tx", |b| {
-//         b.iter(|| {
-//             rt.block_on(async {
-//                 let s = node
-//                     .rpc
-//                     .get_transaction_by_tx_hash(
-//                         B256::from_str(
-//                             "b79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267",
-//                         )
-//                         .expect("ddhoulfsdfds"),
-//                     )
-//                     .await
-//                     .unwrap();
-//                 s
-//             })
-//         });
-//     });
-
-//     group.finish();
-// }
 
 pub fn benchmark_get_numbers(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -212,12 +121,14 @@ pub fn benchmark_number(c: &mut Criterion) {
     let mut group = c.benchmark_group("number_fetch");
     group.sample_size(100);
     group.measurement_time(std::time::Duration::from_secs(44));
+    let mut no = 22423460;
 
     group.bench_function("get_numbers", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let s =
-                    black_box(provider.get_block_by_number(BlockNumberOrTag::Number(22395317))).await;
+                    black_box(provider.get_block_by_number(BlockNumberOrTag::Number(no))).await;
+                    no = no - 1;
                 black_box(s.unwrap())
             })
         });
@@ -245,7 +156,7 @@ pub fn benchmark_get_block_numbers(c: &mut Criterion) {
             rt.block_on(async {
                 let s = black_box(rpc.get_block_by_number(no, true)).await;
                 no = no - 1;
-                black_box(s)
+                black_box(s.unwrap())
             })
        
         });
@@ -284,7 +195,7 @@ pub fn benchmark_execute_raw(c: &mut Criterion) {
         
                 let s = black_box(rpc.execute_raw(request)).await;
                 no = no - 1;
-                black_box(s)
+                black_box(s.unwrap())
             })
        
         });
@@ -298,7 +209,7 @@ pub fn benchmark_execute_raw(c: &mut Criterion) {
 criterion_group!(
     benches,
     // benchmark_number,
-    // benchmark_get_block_numbers,
-    benchmark_execute_raw,
+    benchmark_get_block_numbers,
+    // benchmark_execute_raw,
 );
 criterion_main!(benches);

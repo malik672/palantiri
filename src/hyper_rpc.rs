@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
+use rustls;
 
 use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
@@ -20,7 +21,7 @@ use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    async fn hyper_execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
+    async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError>;
     async fn hyper_execute(&self, request: String) -> Result<String, RpcError>;
 }
 
@@ -587,9 +588,11 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
+        let request_str = serde_json::to_string(&request).unwrap();
+        let request_bytes = Bytes::from(request_str.into_bytes());
         let response = self
             .transport
-            .hyper_execute_raw(serde_json::to_string(&request).unwrap())
+            .hyper_execute_raw(request_bytes.to_vec())
             .await?;
 
         Ok(response)

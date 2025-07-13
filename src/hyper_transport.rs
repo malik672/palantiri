@@ -5,6 +5,7 @@ use std::task::Poll;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::task;
 use http_body_util::BodyExt;
 use hyper::header::HeaderValue;
@@ -64,7 +65,7 @@ impl Service<Vec<u8>> for HyperTransport {
         let this = self.clone();
         let span = debug_span!("HyperTransport::call");
         Box::pin(async move {
-            this.hyper_execute_raw(String::from_utf8(request).unwrap()).instrument(span).await
+            this.hyper_execute_raw(request).instrument(span).await
         })
     }
 
@@ -78,10 +79,10 @@ impl HyperTransport {
         let http_executor = TokioExecutor::new();
 
         let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-        http_connector.set_nodelay(true); 
+        // http_connector.set_nodelay(true); 
         http_connector.enforce_http(false);
-        http_connector.set_reuse_address(true);
-        http_connector.set_keepalive(Some(std::time::Duration::from_secs(30))); 
+        // http_connector.set_reuse_address(true);
+        // http_connector.set_keepalive(Some(std::time::Duration::from_secs(30))); 
     
         let client = hyper_util::client::legacy::Client::builder(http_executor)
         .pool_idle_timeout(DURATION_60)
@@ -125,10 +126,10 @@ impl Transport for HyperTransport {
             .map_err(|e| RpcError::Response(format!("Invalid UTF-8 in response: {}", e)))
     }
 
-    async fn hyper_execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError> {
+    async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError> {
         let url = &self.url;
 
-        let reqs = request.as_bytes().to_owned().into();
+        let reqs = Bytes::from(request);
 
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)

@@ -5,11 +5,13 @@ use std::time::Duration;
 
 pub mod rpc;
 pub mod transport;
+
 pub mod parser;
 pub mod hyper_transport;
 pub mod hyper_rpc;
 use dotenv;
 use std::env;
+
 
 #[derive(Debug)]
 pub struct HttpTransport {
@@ -137,4 +139,8 @@ impl Transport for HttpTransport {
             .map(|b| b.to_vec())
             .map_err(|e| RpcError::Transport(e.to_string()))
     }
+}
+
+pub fn main() {
+    
 }

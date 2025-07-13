@@ -1,0 +1,10 @@
+[package]
+name = "benches"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy = "1.0.5"
+alloy-primitives = "1.1.2"
+palantiri = "0.1.0"
+tokio = { version = "1.45.0", features = ["full"] }

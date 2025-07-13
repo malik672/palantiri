@@ -1,0 +1,12 @@
+/Users/malik/Desktop/mc2/palantiri/benches/target/release/deps/libanstyle-0ab052c14795a687.rmeta: /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/macros.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/color.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/effect.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/reset.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/style.rs
+
+/Users/malik/Desktop/mc2/palantiri/benches/target/release/deps/libanstyle-0ab052c14795a687.rlib: /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/macros.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/color.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/effect.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/reset.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/style.rs
+
+/Users/malik/Desktop/mc2/palantiri/benches/target/release/deps/anstyle-0ab052c14795a687.d: /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/lib.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/macros.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/color.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/effect.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/reset.rs /Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/style.rs
+
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/lib.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/macros.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/color.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/effect.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/reset.rs:
+/Users/malik/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anstyle-1.0.10/src/style.rs:

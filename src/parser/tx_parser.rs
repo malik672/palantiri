@@ -52,6 +52,7 @@ impl<'a> RawTx<'a> {
     #[inline]
     pub fn block_hash(&self) -> B256 {
         let bytes = &self.data[self.block_hash.0..self.block_hash.1];
+        
         hex_to_b256(&bytes[2..])
     }
 

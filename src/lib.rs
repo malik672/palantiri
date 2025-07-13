@@ -6,6 +6,8 @@ use std::time::Duration;
 pub mod rpc;
 pub mod transport;
 pub mod parser;
+pub mod hyper_transport;
+pub mod hyper_rpc;
 use dotenv;
 use std::env;
 

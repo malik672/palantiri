@@ -1,55 +1,36 @@
 use alloy::hex;
 use alloy::primitives::{Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
-use lru::LruCache;
 use parser::types::{FilterParams, TransactionRequest};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::RwLock;
-use std::time::{Duration, Instant};
 
 use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
 use crate::parser::tx_parser::parse_transaction;
 use crate::parser::{
-    types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
     lib::{hex_to_b256, hex_to_u256, hex_to_u64},
+    types::{Block, BlockHeader, Log, RawJsonResponse, TransactionTx},
 };
-
 
 use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
-    async fn execute(&self, request: String) -> Result<String, RpcError>;
+    async fn hyper_execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
+    async fn hyper_execute(&self, request: String) -> Result<String, RpcError>;
 }
 
 pub enum BlockIdentifier {
     Hash(B256),
     Number(u64),
 }
-
-#[derive(Debug, Clone)]
-struct CacheEntry {
-    response: String,
-    timestamp: Instant,
-}
-
-#[derive(Debug)]
-pub struct RequestCache {
-    cache: LruCache<B256, CacheEntry>,
-    ttl: Duration,
-}
-
 #[derive(Debug, Clone)]
 pub struct RpcClient {
     pub transport: Arc<dyn Transport>,
-    pub cache: Arc<RwLock<RequestCache>>,
 }
 
 /// Represents an RPC request to a Ethereum node
@@ -61,49 +42,10 @@ pub struct RpcRequest {
     pub id: u64,
 }
 
-impl RequestCache {
-    pub fn new(capacity: usize, ttl: Duration) -> Self {
-        Self {
-            cache: LruCache::new(NonZeroUsize::new(capacity).unwrap()),
-            ttl,
-        }
-    }
-
-    pub fn get(&mut self, key: &B256) -> Option<String> {
-        if let Some(entry) = self.cache.get(key) {
-            if entry.timestamp.elapsed() < self.ttl {
-                Some(entry.response.to_string())
-            } else {
-                self.cache.pop(key);
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    pub fn insert(&mut self, key: B256, value: String) {
-        self.cache.put(
-            key,
-            CacheEntry {
-                response: value,
-                timestamp: Instant::now(),
-            },
-        );
-    }
-}
-
-impl Default for RequestCache {
-    fn default() -> Self {
-        Self::new(100, Duration::from_secs(60))
-    }
-}
-
 impl RpcClient {
     pub fn new<T: Transport + 'static>(transport: T) -> Self {
         Self {
             transport: Arc::new(transport),
-            cache: Arc::new(RwLock::new(RequestCache::default())),
         }
     }
 
@@ -293,7 +235,6 @@ impl RpcClient {
         };
 
         let response_bytes: Vec<u8> = self.execute_raw(request).await?;
-
 
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
@@ -648,7 +589,7 @@ impl RpcClient {
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
         let response = self
             .transport
-            .execute_raw(serde_json::to_string(&request).unwrap())
+            .hyper_execute_raw(serde_json::to_string(&request).unwrap())
             .await?;
 
         Ok(response)
@@ -657,8 +598,7 @@ impl RpcClient {
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
         let response = self
             .transport
-            //why use unwrap here? well basically we are sure that the request is valid based on the params type tthat act as a check
-            .execute(serde_json::to_string(&request).unwrap())
+            .hyper_execute(serde_json::to_string(&request).unwrap())
             .await?;
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
@@ -681,7 +621,7 @@ mod tests {
             TransportBuilder::new(
                 "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
             )
-            .build_http(),
+            .build_http_hyper(),
         );
 
         let tx: TransactionRequest = TransactionRequest {
@@ -698,5 +638,17 @@ mod tests {
         println!("{:?}{:?}", time.elapsed(), x);
     }
 
+    #[tokio::test]
+    async fn test_get_block() {
+        let rpc = RpcClient::new(
+            TransportBuilder::new(
+                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+            )
+            .build_http_hyper(),
 
+        );
+
+
+            let x = rpc.get_block_by_number(22349461, true);
+    }
 }

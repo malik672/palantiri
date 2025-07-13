@@ -1,26 +1,52 @@
-use super::lib::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use super::lib::{find_field, hex_to_b256, hex_to_u256, hex_to_u64, unsafe_hex_to_address, unsafe_hex_to_b256};
 use super::types::Block;
+
+// Field indices for fast lookup
+const FIELD_COUNT: usize = 17;
+const NUMBER: usize = 0;
+const HASH: usize = 1;
+const PARENT_HASH: usize = 2;
+const UNCLES_HASH: usize = 3;
+const AUTHOR: usize = 4;
+const STATE_ROOT: usize = 5;
+const TRANSACTIONS_ROOT: usize = 6;
+const RECEIPTS_ROOT: usize = 7;
+const LOGS_BLOOM: usize = 8;
+const DIFFICULTY: usize = 9;
+const GAS_LIMIT: usize = 10;
+const GAS_USED: usize = 11;
+const TIMESTAMP: usize = 12;
+const EXTRA_DATA: usize = 13;
+const MIX_HASH: usize = 14;
+const NONCE: usize = 15;
+const BASE_FEE_PER_GAS: usize = 16;
+
+// Field patterns for search
+static FIELD_PATTERNS: [(&[u8], &[u8]); FIELD_COUNT] = [
+    (b"\"number\":\"", b"\""),
+    (b"\"hash\":\"", b"\""),
+    (b"\"parentHash\":\"", b"\""),
+    (b"\"sha3Uncles\":\"", b"\""),
+    (b"\"miner\":\"", b"\""),
+    (b"\"stateRoot\":\"", b"\""),
+    (b"\"transactionsRoot\":\"", b"\""),
+    (b"\"receiptsRoot\":\"", b"\""),
+    (b"\"logsBloom\":\"", b"\""),
+    (b"\"difficulty\":\"", b"\""),
+    (b"\"gasLimit\":\"", b"\""),
+    (b"\"gasUsed\":\"", b"\""),
+    (b"\"timestamp\":\"", b"\""),
+    (b"\"extraData\":\"", b"\""),
+    (b"\"mixHash\":\"", b"\""),
+    (b"\"nonce\":\"", b"\""),
+    (b"\"baseFeePerGas\":\"", b"\""),
+];
 
 #[derive(Debug)]
 pub struct RawBlock<'a> {
     data: &'a [u8],
-    number: (usize, usize),
-    hash: (usize, usize),
-    parent_hash: (usize, usize),
-    uncles_hash: (usize, usize),
-    author: (usize, usize),
-    state_root: (usize, usize),
-    transactions_root: (usize, usize),
-    receipts_root: (usize, usize),
-    logs_bloom: (usize, usize),
-    difficulty: (usize, usize),
-    gas_limit: (usize, usize),
-    gas_used: (usize, usize),
-    timestamp: (usize, usize),
-    extra_data: (usize, usize),
-    mix_hash: (usize, usize),
-    nonce: (usize, usize),
-    base_fee_per_gas: (usize, usize),
+    fields: [(usize, usize); FIELD_COUNT],
+    fields_present: u32,
     transactions: Vec<(usize, usize)>,
     uncles: Vec<(usize, usize)>,
 }
@@ -35,133 +61,183 @@ pub struct RawJsonResponse<'a> {
 impl<'a> RawBlock<'a> {
     #[inline]
     pub fn parse(input: &'a [u8]) -> Option<Self> {
+        // Use a bitfield to track which fields are present (faster than Option<>)
+        let mut fields_present: u32 = 0;
+        let mut fields = [(0, 0); FIELD_COUNT];
+        
+        // Parse all fields in one batch operation
+        for (idx, &(prefix, suffix)) in FIELD_PATTERNS.iter().enumerate() {
+            if let Some(range) = find_field(input, prefix, suffix) {
+                fields[idx] = range;
+                fields_present |= 1 << idx;
+            }
+        }
+        
+        /*This should be returned one day but for a perfect block we never hit this */
+        // if (fields_present & ((1 << NUMBER) | (1 << HASH))) != ((1 << NUMBER) | (1 << HASH)) {
+        //     println!("Missing required fields: number or hash");
+        //     return None;
+        // }
+
+        
+        // Estimate transaction count for efficient allocation
+        /*Now this is quite normal we hit ,ore 500 than 32 so removing the branch is cool is here */
+        // let tx_capacity = if input.len() > 100_000 {println!("mogged"); 500 } else {  println!("Estimated transaction count"); 32 };
+        let mut transactions = Vec::with_capacity(500);
+        let mut uncles = Vec::with_capacity(2); 
+        
+        // Parse transaction array - only if we need it
+        Self::parse_transactions_array(input, &mut transactions);
+        Self::parse_uncles_array(input, &mut uncles);
+        
         Some(Self {
             data: input,
-            number: find_field(input, b"\"number\":\"", b"\"")?,
-            hash: find_field(input, b"\"hash\":\"", b"\"")?,
-            parent_hash: find_field(input, b"\"parentHash\":\"", b"\"")?,
-            uncles_hash: find_field(input, b"\"sha3Uncles\":\"", b"\"")?,
-            author: find_field(input, b"\"miner\":\"", b"\"")?,
-            state_root: find_field(input, b"\"stateRoot\":\"", b"\"")?,
-            transactions_root: find_field(input, b"\"transactionsRoot\":\"", b"\"")?,
-            receipts_root: find_field(input, b"\"receiptsRoot\":\"", b"\"")?,
-            logs_bloom: find_field(input, b"\"logsBloom\":\"", b"\"")?,
-            difficulty: find_field(input, b"\"difficulty\":\"", b"\"")?,
-            gas_limit: find_field(input, b"\"gasLimit\":\"", b"\"")?,
-            gas_used: find_field(input, b"\"gasUsed\":\"", b"\"")?,
-            timestamp: find_field(input, b"\"timestamp\":\"", b"\"")?,
-            extra_data: find_field(input, b"\"extraData\":\"", b"\"")?,
-            mix_hash: find_field(input, b"\"mixHash\":\"", b"\"")?,
-            nonce: find_field(input, b"\"nonce\":\"", b"\"")?,
-            base_fee_per_gas: find_field(input, b"\"baseFeePerGas\":\"", b"\"")?,
-            transactions: Self::parse_transactions_array(input)?,
-            uncles: Self::parse_uncles_array(input)?,
+            fields,
+            fields_present,
+            transactions,
+            uncles,
         })
     }
 
     #[inline]
+    fn parse_transactions_array(data: &[u8], result: &mut Vec<(usize, usize)>) {
+        // Use our existing find_field to locate the transactions array start
+        if let Some(start) = memchr::memmem::find(data, b"\"transactions\":[") {
+            let mut pos = start + b"\"transactions\":[".len();
+            
+            // Single-pass extraction of all transaction hashes
+            let len = data.len();
+            while pos < data.len() {
+                // Skip whitespace and commas
+                while pos < len && (data[pos] == b' ' || data[pos] == b',' || data[pos] == b'\n') {
+                    pos += 1;
+                }
+                
+                if pos >= len || data[pos] == b']' {
+                    break;
+                }
+                
+                // Only process string values (transaction hashes)
+                if data[pos] == b'"' {
+                    pos += 1; 
+                    let tx_start = pos;
+                    
+                    // Find closing quote efficiently using memchr
+                    if let Some(end_offset) = memchr::memchr(b'"', &data[pos..]) {
+                        let tx_end = pos + end_offset;
+                        result.push((tx_start, tx_end));
+                        pos = tx_end + 1; 
+                    } else {
+                        break;
+                    }
+                } else {
+                    // Not a string, might be an object or something else
+                    // Skip until next comma or closing bracket
+                    while pos < len && data[pos] != b',' && data[pos] != b']' {
+                        pos += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn parse_uncles_array(data: &[u8], result: &mut Vec<(usize, usize)>) {
+        // Similar approach as transactions array but for uncles
+        if let Some(start) = memchr::memmem::find(data, b"\"uncles\":[") {
+            let mut pos = start + b"\"uncles\":[".len();
+            
+            while pos < data.len() {
+                // Skip whitespace and commas
+                while pos < data.len() && (data[pos] == b' ' || data[pos] == b',' || data[pos] == b'\n') {
+                    pos += 1;
+                }
+                
+                if pos >= data.len() || data[pos] == b']' {
+                    break;
+                }
+                
+                if data[pos] == b'"' {
+                    pos += 1; // Skip opening quote
+                    let uncle_start = pos;
+                    
+                    if let Some(end_offset) = memchr::memchr(b'"', &data[pos..]) {
+                        let uncle_end = pos + end_offset;
+                        result.push((uncle_start, uncle_end));
+                        pos = uncle_end + 1; // Move past closing quote
+                    } else {
+                        break;
+                    }
+                } else {
+                    while pos < data.len() && data[pos] != b',' && data[pos] != b']' {
+                        pos += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    #[inline]
     pub fn to_block(&self) -> Block {
+        // Helper to check field presence and get slice
+        let get_field = |idx: usize| -> &[u8] {
+            if (self.fields_present & (1 << idx)) != 0 {
+                let (start, end) = self.fields[idx];
+                &self.data[start..end]
+            } else {
+                b"0x0" 
+            }
+        };
+        
         Block {
-            number: hex_to_u64(&self.data[self.number.0..self.number.1]),
-            hash: Some(hex_to_b256(&self.data[self.hash.0..self.hash.1])),
-            parent_hash: hex_to_b256(&self.data[self.parent_hash.0..self.parent_hash.1]),
-            uncles_hash: hex_to_b256(&self.data[self.uncles_hash.0..self.uncles_hash.1]),
-            author: hex_to_address(&self.data[self.author.0..self.author.1]),
-            state_root: hex_to_b256(&self.data[self.state_root.0..self.state_root.1]),
-            transactions_root: hex_to_b256(
-                &self.data[self.transactions_root.0..self.transactions_root.1],
-            ),
-            receipts_root: hex_to_b256(&self.data[self.receipts_root.0..self.receipts_root.1]),
-            logs_bloom: String::from_utf8_lossy(&self.data[self.logs_bloom.0..self.logs_bloom.1])
-                .to_string(),
-            difficulty: hex_to_u64(&self.data[self.difficulty.0..self.difficulty.1]),
-            gas_limit: hex_to_u256(&self.data[self.gas_limit.0..self.gas_limit.1]),
-            gas_used: hex_to_u256(&self.data[self.gas_used.0..self.gas_used.1]),
-            timestamp: hex_to_u64(&self.data[self.timestamp.0..self.timestamp.1]),
-            extra_data: String::from_utf8_lossy(&self.data[self.extra_data.0..self.extra_data.1])
-                .to_string(),
-            mix_hash: hex_to_b256(&self.data[self.mix_hash.0..self.mix_hash.1]),
-            nonce: hex_to_u64(&self.data[self.nonce.0..self.nonce.1]),
-            base_fee_per_gas: Some(hex_to_u256(
-                &self.data[self.base_fee_per_gas.0..self.base_fee_per_gas.1],
-            )),
+            number: hex_to_u64(get_field(NUMBER)),
+            hash: Some(hex_to_b256(get_field(HASH))),
+            parent_hash: unsafe_hex_to_b256(get_field(PARENT_HASH)),
+            uncles_hash: unsafe_hex_to_b256(get_field(UNCLES_HASH)),
+            author: unsafe_hex_to_address(get_field(AUTHOR)),
+            state_root: unsafe_hex_to_b256(get_field(STATE_ROOT)),
+            transactions_root: unsafe_hex_to_b256(get_field(TRANSACTIONS_ROOT)),
+            receipts_root: unsafe_hex_to_b256(get_field(RECEIPTS_ROOT)),
+            logs_bloom: String::from_utf8_lossy(get_field(LOGS_BLOOM)).into_owned(),
+            difficulty: hex_to_u64(get_field(DIFFICULTY)),
+            gas_limit: hex_to_u256(get_field(GAS_LIMIT)),
+            gas_used: hex_to_u256(get_field(GAS_USED)),
+            timestamp: hex_to_u64(get_field(TIMESTAMP)),
+            extra_data: String::from_utf8_lossy(get_field(EXTRA_DATA)).into_owned(),
+            mix_hash: unsafe_hex_to_b256(get_field(MIX_HASH)),
+            nonce: hex_to_u64(get_field(NONCE)),
+            base_fee_per_gas: Some(hex_to_u256(get_field(BASE_FEE_PER_GAS))),
             prev_randao: None,
-            transactions: self
-                .transactions
+            // Process transactions and uncles as needed
+            transactions: self.transactions
                 .iter()
                 .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
                 .collect(),
-            uncles: self
-                .uncles
+            uncles: self.uncles
                 .iter()
-                .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
+                .map(|&(s, e)| hex_to_b256(&self.data[s..e ]))
                 .collect(),
         }
-    }
-
-    pub fn parse_transactions_array(data: &[u8]) -> Option<Vec<(usize, usize)>> {
-        let start = memchr::memmem::find(data, b"\"transactions\":[")?;
-        let mut pos = start + b"\"transactions\":[".len();
-        let mut result = Vec::new();
-
-        while data[pos] != b']' {
-            while data[pos] != b'"' && data[pos] != b']' {
-                pos += 1;
-            }
-            if data[pos] == b']' {
-                break;
-            }
-            pos += 1;
-            let tx_start = pos;
-
-            while data[pos] != b'"' {
-                pos += 1;
-            }
-            result.push((tx_start, pos));
-            pos += 1;
-        }
-
-        Some(result)
-    }
-
-    pub fn parse_uncles_array(data: &[u8]) -> Option<Vec<(usize, usize)>> {
-        let start = memchr::memmem::find(data, b"\"uncles\":[")?;
-        let mut pos = start + b"\"uncles\":[".len();
-        let mut result = Vec::new();
-
-        while data[pos] != b']' {
-            while data[pos] != b'"' && data[pos] != b']' {
-                pos += 1;
-            }
-            if data[pos] == b']' {
-                break;
-            }
-            pos += 1;
-            let tx_start = pos;
-
-            while data[pos] != b'"' {
-                pos += 1;
-            }
-            result.push((tx_start, pos));
-            pos += 1;
-        }
-
-        Some(result)
     }
 }
 
 impl<'a> RawJsonResponse<'a> {
     #[inline]
     pub fn parse_block(input: &'a [u8]) -> Option<Self> {
+        // Fast check for null result
         if memchr::memmem::find(input, b"\"result\":null").is_some() {
             return None;
         }
+        
+        // Find result object
         let start = memchr::memmem::find(input, b"\"result\":{")?;
         let start = start + 9;
 
-        // Find matching closing }
+        // Fast bracket matching to find the end of the result object
         let mut pos = start;
         let mut depth = 1;
+        
+        // Single-pass bracket matching - most efficient way
         while depth > 0 && pos < input.len() {
             match input[pos] {
                 b'{' => depth += 1,
@@ -174,19 +250,22 @@ impl<'a> RawJsonResponse<'a> {
         Some(Self {
             data: input,
             result_start: start,
-            // exclude closing }
-            result_end: pos - 1,
+            result_end: pos - 1, // exclude closing }
         })
     }
 
     #[inline]
     pub fn block(&self) -> Option<RawBlock<'a>> {
-        RawBlock::parse(&self.data[self.result_start..=self.result_end])
+        // Extract only the relevant part of the JSON
+        let block_data = &self.data[self.result_start..=self.result_end];
+        RawBlock::parse(block_data)
     }
 }
 
+#[inline]
 pub fn parse_block(input: &[u8]) -> Option<Block> {
+    // Fast path - direct pipeline
     RawJsonResponse::parse_block(input)
         .and_then(|r| r.block())
-        .map(|tx| tx.to_block())
+        .map(|block| block.to_block())
 }

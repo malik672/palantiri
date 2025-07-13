@@ -4,7 +4,7 @@ use alloy::primitives::{Address, B256, U256, U64};
 use super::types::RawJsonResponse;
 use super::types::TransactionTx;
 
-use super::lib::{find_field, hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use super::lib::{find_field, unsafe_hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
 
 #[derive(Debug)]
 pub struct RawTx<'a> {
@@ -58,7 +58,7 @@ impl<'a> RawTx<'a> {
     #[inline]
     pub fn from(&self) -> Address {
         let bytes = &self.data[self.from.0..self.from.1];
-        hex_to_address(&bytes[2..])
+        unsafe_hex_to_address(&bytes[2..])
     }
 
     #[inline]
@@ -120,7 +120,7 @@ impl<'a> RawTx<'a> {
     #[inline]
     fn to(&self) -> Address {
         let bytes = &self.data[self.to.0..self.to.1];
-        hex_to_address(&bytes[2..])
+        unsafe_hex_to_address(&bytes[2..])
     }
 
     #[inline]

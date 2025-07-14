@@ -2729,7 +2729,6 @@ dependencies = [
  "hyper",
  "hyper-content-encoding",
  "hyper-rustls",
- "hyper-tls",
  "hyper-util",
  "lru",
  "memchr",

@@ -32,50 +32,9 @@ pub struct HyperTransport {
     url: String,
 }
 
-/// Implementation of Tower's Service trait for Hyper_Execute
-impl Service<String> for HyperTransport {
-    type Response = String;
-    type Error = RpcError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
-
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, request: String) -> Self::Future {
-        let this = self.clone();
-        let span = debug_span!("HyperTransport::call");
-        Box::pin(async move {
-            this.hyper_execute(request).instrument(span).await
-        })
-    }
-
-}
-
-impl Service<Vec<u8>> for HyperTransport {
-    type Response = Vec<u8>;
-    type Error = RpcError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
-
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, request: Vec<u8>) -> Self::Future {
-        let this = self.clone();
-        let span = debug_span!("HyperTransport::call");
-        Box::pin(async move {
-            this.hyper_execute_raw(request).instrument(span).await
-        })
-    }
-
-}
-
-
 impl HyperTransport {
     pub fn new(url: String) -> Self {
         debug!("Creating new HyperTransport for URL: {}", url);
-           println!("Creating new RpcClient with transport: {:?}", 10);
 
         let http_executor = TokioExecutor::new();
 

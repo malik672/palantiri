@@ -2,12 +2,12 @@ use alloy::hex;
 use alloy::primitives::{Address, BlockNumber, Bytes, FixedBytes, B256, U256, U64};
 use async_trait::async_trait;
 use parser::types::{FilterParams, TransactionRequest};
+use rustls;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
-use rustls;
 
 use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
@@ -648,10 +648,15 @@ mod tests {
                 "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
             )
             .build_http_hyper(),
-
         );
 
-
-            let x = rpc.get_block_by_number(22349461, true);
+        match rpc.get_block_by_number(22349461, true).await {
+            Ok(block) => {
+                println!("Block data: {:?}", block);
+            }
+            Err(e) => {
+                eprintln!("Failed to fetch block 22349461: {:?}", e);
+            }
+        }
     }
 }

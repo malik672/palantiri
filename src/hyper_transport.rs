@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::header::HeaderValue;
-use hyper_rustls::HttpsConnector;
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::rt::TokioExecutor;
 use tracing::{debug, info};
 
@@ -17,7 +17,7 @@ const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/jso
 #[derive(Debug, Clone)]
 pub struct HyperTransport {
  client: hyper_util::client::legacy::Client<
-        hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+        HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
         http_body_util::Full<::hyper::body::Bytes>,
     >,
     url: String,
@@ -32,8 +32,8 @@ impl HyperTransport {
         let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
         http_connector.enforce_http(false);
     
-        let https_connector = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots()
+        let https_connector = HttpsConnectorBuilder::new()
+              .with_provider_and_webpki_roots(rustls::crypto::aws_lc_rs::default_provider())
             .expect("Failed to load native root certificates")
             .https_or_http()
             .enable_http1()

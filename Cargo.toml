@@ -22,7 +22,7 @@ http = "1.3.1"
 http-body-util = "0.1.3"
 hyper = { version = "1.2", features = ["client", "full", "http1", "http2"] }
 hyper-content-encoding = "0.1.1"
-hyper-rustls = "0.27.5"
+hyper-rustls = { version = "0.27.5", features = ["http2"] }
 hyper-tls = "0.6.0"
 hyper-util = {version = "0.1.11", features = ["full"]}
 lru = "0.13.0"

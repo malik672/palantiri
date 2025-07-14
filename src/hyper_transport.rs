@@ -1,20 +1,12 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::Poll;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::task;
 use http_body_util::BodyExt;
 use hyper::header::HeaderValue;
-use hyper_tls::HttpsConnector;
-use tower::limit::rate::Rate;
-use tower::{Service, ServiceBuilder, ServiceExt};
-use tracing::{debug, debug_span, error, info, trace, Instrument};
-use hyper_util::client::legacy::{Builder, Client};
+use hyper_rustls::HttpsConnector;
 use hyper_util::rt::TokioExecutor;
+use tracing::{debug, info};
 
 use crate::hyper_rpc::Transport;
 use crate::RpcError;
@@ -24,11 +16,10 @@ const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/jso
 
 #[derive(Debug, Clone)]
 pub struct HyperTransport {
-    client: hyper_util::client::legacy::Client<
-        hyper_tls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+ client: hyper_util::client::legacy::Client<
+        hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
         http_body_util::Full<::hyper::body::Bytes>,
     >,
-
     url: String,
 }
 
@@ -39,16 +30,21 @@ impl HyperTransport {
         let http_executor = TokioExecutor::new();
 
         let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-        // http_connector.set_nodelay(true); 
         http_connector.enforce_http(false);
-        // http_connector.set_reuse_address(true);
-        // http_connector.set_keepalive(Some(std::time::Duration::from_secs(30))); 
     
+        let https_connector = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .expect("Failed to load native root certificates")
+            .https_or_http()
+            .enable_http1()
+            .enable_http2()
+            .wrap_connector(http_connector);
+
         let client = hyper_util::client::legacy::Client::builder(http_executor)
-        .pool_idle_timeout(DURATION_60)
-        .pool_max_idle_per_host(32)
-        .retry_canceled_requests(true)
-            .build(hyper_tls::HttpsConnector::new_with_connector(http_connector));
+            .pool_idle_timeout(DURATION_60)
+            .pool_max_idle_per_host(32)
+            .retry_canceled_requests(true)
+            .build(https_connector);
 
         info!("HyperTransport client created successfully");
         Self { client, url }

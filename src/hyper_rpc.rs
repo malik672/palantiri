@@ -20,7 +20,7 @@ use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    async fn hyper_execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError>;
+    async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError>;
     async fn hyper_execute(&self, request: String) -> Result<String, RpcError>;
 }
 
@@ -587,9 +587,11 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
+        let request_str = serde_json::to_string(&request).unwrap();
+        let request_bytes = Bytes::from(request_str.into_bytes());
         let response = self
             .transport
-            .hyper_execute_raw(serde_json::to_string(&request).unwrap())
+            .hyper_execute_raw(request_bytes.to_vec())
             .await?;
 
         Ok(response)
@@ -645,10 +647,8 @@ mod tests {
                 "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
             )
             .build_http_hyper(),
-
         );
 
-
-            let x = rpc.get_block_by_number(22349461, true);
+        let x = rpc.get_block_by_number(22349461, true);
     }
 }

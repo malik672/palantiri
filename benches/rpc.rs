@@ -8,7 +8,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use palantiri::{hyper_rpc::RpcRequest, parser::types::TransactionRequest};
 use tokio::runtime::Runtime;
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::{atomic::{AtomicU64, Ordering}, Arc}, time::Duration};
 
 use alloy::providers::{Provider, ProviderBuilder};
 
@@ -208,97 +208,69 @@ pub fn benchmark_number(c: &mut Criterion) {
         .parse()
         .unwrap();
     let provider = ProviderBuilder::new().on_http(rpc_url);
-
-    let mut group = c.benchmark_group("number_fetch");
-    group.sample_size(100);
-    group.measurement_time(std::time::Duration::from_secs(44));
-
+    
+    // Use atomic counter to avoid shared mutable state issues
+    let block_counter = AtomicU64::new(22812202);
+    
+    let mut group = c.benchmark_group("ethereum_rpc");
+    group.sample_size(50);
+    group.measurement_time(std::time::Duration::from_secs(30));
+    
     group.bench_function("get_numbers", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let s =
-                    black_box(provider.get_block_by_number(BlockNumberOrTag::Number(22395317))).await;
-                black_box(s.unwrap())
+                let block_num = block_counter.fetch_sub(1, Ordering::SeqCst);
+                let result = provider
+                    .get_block_by_number(BlockNumberOrTag::Number(block_num))
+                    .await;
+                
+                // Handle errors gracefully for benchmarking
+                match result {
+                    Ok(block) => black_box(block),
+                    Err(e) => {
+                        eprintln!("Error fetching block {}: {}", block_num, e);
+                        black_box(None)
+                    }
+                }
             })
         });
     });
+    
+    group.finish();
 }
 
 pub fn benchmark_get_block_numbers(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-
+    
     let rpc = HyperRpcClient::new(
         TransportBuilder::new(
             "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
         )
         .build_http_hyper(),
     );
-
-    let mut group = c.benchmark_group("number_fetch");
-    group.sample_size(100);
-    let mut no = 22423460;
-    group.measurement_time(std::time::Duration::from_secs(44));
-
+    
+    let block_counter = AtomicU64::new(22812202);
+    
+    let mut group = c.benchmark_group("ethereum_rpc");
+    group.sample_size(50);
+    group.measurement_time(std::time::Duration::from_secs(30));
+    
     group.bench_function("get_numbers_palantiri", |b| {
         b.iter(|| {
-         
             rt.block_on(async {
-                let s = black_box(rpc.get_block_by_number(no, true)).await;
-                no = no - 1;
-                black_box(s)
+                let block_num = block_counter.fetch_sub(1, Ordering::SeqCst);
+                let result = rpc.get_block_by_number(block_num, true).await;
+                black_box(result)
             })
-       
         });
-
-        
     });
-
-    group.finish();
-}
-
-pub fn benchmark_execute_raw(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-
-    let rpc = HyperRpcClient::new(
-        TransportBuilder::new(
-            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
-        )
-        .build_http_hyper(),
-    );
-
-    let mut group = c.benchmark_group("number_fetch");
-    group.sample_size(100);
-    let mut no = 22440939;
-    group.measurement_time(std::time::Duration::from_secs(44));
-
-    group.bench_function("get_execute_raw", |b| {
-        b.iter(|| {
-         
-            rt.block_on(async {
-                let request = RpcRequest {
-                    jsonrpc: "2.0",
-                    method: "eth_getBlockByNumber",
-                    params: serde_json::json!([format!("0x{:x}", no), true]),
-                    id: 1,
-                };
-        
-                let s = black_box(rpc.execute_raw(request)).await;
-                no = no - 1;
-                black_box(s)
-            })
-       
-        });
-
-        
-    });
-
+    
     group.finish();
 }
 
 criterion_group!(
     benches,
     // benchmark_number,
-    // benchmark_get_block_numbers,
-    benchmark_execute_raw,
+    benchmark_get_block_numbers,
 );
 criterion_main!(benches);

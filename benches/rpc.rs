@@ -242,7 +242,7 @@ pub fn benchmark_get_block_numbers(c: &mut Criterion) {
     
     let rpc = HyperRpcClient::new(
         TransportBuilder::new(
-            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+            "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4",
         )
         .build_http_hyper(),
     );

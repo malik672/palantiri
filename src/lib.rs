@@ -1,9 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
-use rpc::Transport;
 use std::time::Duration;
 
-pub mod rpc;
 pub mod transport;
 pub mod parser;
 pub mod hyper_transport;
@@ -99,42 +97,4 @@ impl HttpTransport {
     }
 }
 
-#[async_trait]
-impl Transport for HttpTransport {
-    async fn execute(&self, request: String) -> Result<String, RpcError> {
-        let url = &self.urls[self.current_url];
 
-        let response = self
-            .client
-            .post(url)
-            .header("Content-Type", "application/json")
-            .body(request)
-            .send()
-            .await
-            .map_err(|e| RpcError::Transport(e.to_string()))?;
-
-        response
-            .text()
-            .await
-            .map_err(|e| RpcError::Transport(e.to_string()))
-    }
-
-    async fn execute_raw(&self, request: String) -> Result<Vec<u8>, RpcError> {
-        let url = &self.urls[self.current_url];
-
-        let response = self
-            .client
-            .post(url)
-            .header("Content-Type", "application/json")
-            .body(request)
-            .send()
-            .await
-            .map_err(|e| RpcError::Transport(e.to_string()))?;
-
-        response
-            .bytes()
-            .await
-            .map(|b| b.to_vec())
-            .map_err(|e| RpcError::Transport(e.to_string()))
-    }
-}

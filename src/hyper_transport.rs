@@ -36,7 +36,8 @@ impl HyperTransport {
         http_connector.set_connect_timeout(Some(CONNECTION_TIMEOUT));
 
         http_connector.set_keepalive(Some(Duration::from_secs(60)));
-        http_connector.set_send_buffer_size(Some(1024 * 1024 ));
+
+        http_connector.set_nodelay(true);
 
 
         http_connector.enforce_http(false);

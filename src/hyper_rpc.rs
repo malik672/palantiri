@@ -587,12 +587,15 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        let request_str = serde_json::to_string(&request).unwrap();
+        let request_str = format!(
+            r#"{{"jsonrpc":"{}","method":"{}","params":{},"id":{}}}"#,
+            request.jsonrpc, request.method, request.params, request.id
+        );
 
         // SAFETY: `request_str` is guaranteed to live until hyper_execute_raw completes.
         // hyper_execute_raw only uses the data for the HTTP request and doesn't store
         // the reference beyond its execution.
-        // The scope here is the execute_raw has to wait for `hyper_execute_raw` to complete berfore dropping the reference.
+        // The scope here ensures that execute_raw awaits the completion of hyper_execute_raw before request_str (and thus the underlying bytes) is dropped.
         let static_ref: &'static [u8] =
             unsafe { std::slice::from_raw_parts(request_str.as_ptr(), request_str.len()) };
 

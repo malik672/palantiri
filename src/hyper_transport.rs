@@ -10,9 +10,10 @@ use tracing::{debug, info};
 use crate::hyper_rpc::Transport;
 use crate::RpcError;
 
-const DURATION_60: Duration = std::time::Duration::from_secs(30);
+const DURATION_TIMEOUT: Duration = std::time::Duration::from_secs(300);
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
 const CONNECTION_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_IDLE_POOL: usize = 1000;
 
 
 
@@ -51,8 +52,8 @@ impl HyperTransport {
             .wrap_connector(http_connector);
 
         let client = hyper_util::client::legacy::Client::builder(http_executor)
-            .pool_idle_timeout(DURATION_60)
-            .pool_max_idle_per_host(50)
+            .pool_idle_timeout(DURATION_TIMEOUT)
+            .pool_max_idle_per_host(MAX_IDLE_POOL)
             .retry_canceled_requests(false)
             .build(https_connector);
 
@@ -92,10 +93,10 @@ impl Transport for HyperTransport {
             .map_err(|e| RpcError::Response(format!("Invalid UTF-8 in response: {}", e)))
     }
 
-    async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError> {
+    async fn hyper_execute_raw(&self, request: &'static [u8]) -> Result<Vec<u8>, RpcError> {
         let url = self.url;
 
-        let reqs = Bytes::from(request);
+        let reqs = Bytes::from_static(request);
 
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)

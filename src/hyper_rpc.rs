@@ -605,10 +605,11 @@ impl RpcClient {
     }
 
     pub async fn execute<T: DeserializeOwned>(&self, request: RpcRequest) -> Result<T, RpcError> {
-        let response = self
-            .transport
-            .hyper_execute(serde_json::to_string(&request).unwrap())
-            .await?;
+        let request_str = format!(
+            r#"{{"jsonrpc":"{}","method":"{}","params":{},"id":{}}}"#,
+            request.jsonrpc, request.method, request.params, request.id
+        );
+        let response = self.transport.hyper_execute(request_str).await?;
 
         serde_json::from_str(&response).map_err(|e| RpcError::Parse(e.to_string()))
     }

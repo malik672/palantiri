@@ -10,8 +10,11 @@ use tracing::{debug, info};
 use crate::hyper_rpc::Transport;
 use crate::RpcError;
 
-const DURATION_60: Duration = std::time::Duration::from_secs(60);
+const DURATION_60: Duration = std::time::Duration::from_secs(30);
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
+const CONNECTION_TIMEOUT: Duration = Duration::from_secs(10);
+
+
 
 #[derive(Debug, Clone)]
 pub struct HyperTransport {
@@ -29,6 +32,14 @@ impl HyperTransport {
         let http_executor = TokioExecutor::new();
 
         let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
+
+        http_connector.set_connect_timeout(Some(CONNECTION_TIMEOUT));
+
+        http_connector.set_keepalive(Some(Duration::from_secs(60)));
+
+        http_connector.set_nodelay(true);
+
+
         http_connector.enforce_http(false);
     
         let https_connector = HttpsConnectorBuilder::new()
@@ -41,8 +52,8 @@ impl HyperTransport {
 
         let client = hyper_util::client::legacy::Client::builder(http_executor)
             .pool_idle_timeout(DURATION_60)
-            .pool_max_idle_per_host(32)
-            .retry_canceled_requests(true)
+            .pool_max_idle_per_host(50)
+            .retry_canceled_requests(false)
             .build(https_connector);
 
         info!("HyperTransport client created successfully");
@@ -106,6 +117,6 @@ impl Transport for HyperTransport {
             .map_err(|e| RpcError::Transport(e.to_string()))?
             .to_bytes();
 
-        Ok(body_bytes.to_vec())
+        Ok(body_bytes.into())
     }
 }

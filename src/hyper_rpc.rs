@@ -621,7 +621,7 @@ mod tests {
 
         let client = RpcClient::new(
             TransportBuilder::new(
-                "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL".to_string(),
+                "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL",
             )
             .build_http_hyper(),
         );
@@ -644,7 +644,7 @@ mod tests {
     async fn test_get_block() {
         let rpc = RpcClient::new(
             TransportBuilder::new(
-                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4".to_string(),
+                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4",
             )
             .build_http_hyper(),
         );

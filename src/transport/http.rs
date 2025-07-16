@@ -10,14 +10,14 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 }
 
 pub struct TransportBuilder {
-    url: String,
+    url:  &'static str,
     timeout: Duration,
     max_retries: u32,
     pool_max_idle: u32,
 }
 
 impl TransportBuilder {
-    pub fn new(url: String) -> Self {
+    pub fn new(url:  &'static str) -> Self {
         Self {
             url,
             timeout: Duration::from_secs(10),

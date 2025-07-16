@@ -22,11 +22,11 @@ pub struct HyperTransport {
         HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
         http_body_util::Full<::hyper::body::Bytes>,
     >,
-    url: String,
+    url:  &'static str,
 }
 
 impl HyperTransport {
-    pub fn new(url: String) -> Self {
+    pub fn new(url:  &'static str) -> Self {
         debug!("Creating new HyperTransport for URL: {}", url);
 
         let http_executor = TokioExecutor::new();
@@ -64,13 +64,13 @@ impl HyperTransport {
 #[async_trait]
 impl Transport for HyperTransport {
     async fn hyper_execute(&self, request: String) -> Result<String, RpcError> {
-        let url = &self.url;
+        let url = self.url;
 
         let reqs = request.as_bytes().to_owned().into();
 
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)
-            .uri(url.as_str())
+            .uri(url)
             .header("Content-Type", CONTENT_TYPE_JSON)
             .body(http_body_util::Full::new(reqs))
             .expect("Failed to build request");
@@ -93,13 +93,13 @@ impl Transport for HyperTransport {
     }
 
     async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError> {
-        let url = &self.url;
+        let url = self.url;
 
         let reqs = Bytes::from(request);
 
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)
-            .uri(url.as_str())
+            .uri(url)
             .header("Content-Type", CONTENT_TYPE_JSON)
             .body(http_body_util::Full::new(reqs))
             .expect("Failed to build request");

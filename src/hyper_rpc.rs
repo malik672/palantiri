@@ -20,7 +20,7 @@ use super::*;
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
-    async fn hyper_execute_raw(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError>;
+    async fn hyper_execute_raw(&self, request: &'static [u8]) -> Result<Vec<u8>, RpcError>;
     async fn hyper_execute(&self, request: String) -> Result<String, RpcError>;
 }
 
@@ -588,11 +588,15 @@ impl RpcClient {
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
         let request_str = serde_json::to_string(&request).unwrap();
-        let request_bytes = Bytes::from(request_str.into_bytes());
-        let response = self
-            .transport
-            .hyper_execute_raw(request_bytes.to_vec())
-            .await?;
+
+        // SAFETY: `request_str` is guaranteed to live until hyper_execute_raw completes.
+        // hyper_execute_raw only uses the data for the HTTP request and doesn't store
+        // the reference beyond its execution.
+        // The scope here is the execute_raw has to wait for `hyper_execute_raw` to complete berfore dropping the reference.
+        let static_ref: &'static [u8] =
+            unsafe { std::slice::from_raw_parts(request_str.as_ptr(), request_str.len()) };
+
+        let response = self.transport.hyper_execute_raw(static_ref).await?;
 
         Ok(response)
     }
@@ -620,10 +624,8 @@ mod tests {
         let time = Instant::now();
 
         let client = RpcClient::new(
-            TransportBuilder::new(
-                "https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL",
-            )
-            .build_http_hyper(),
+            TransportBuilder::new("https://mainnet.infura.io/v3/2DCsBRUv8lDFmznC1BGik1pFKAL")
+                .build_http_hyper(),
         );
 
         let tx: TransactionRequest = TransactionRequest {
@@ -643,12 +645,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_block() {
         let rpc = RpcClient::new(
-            TransportBuilder::new(
-                "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4",
-            )
-            .build_http_hyper(),
+            TransportBuilder::new("https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4")
+                .build_http_hyper(),
         );
 
         let x = rpc.get_block_by_number(22349461, true);
+        println!("{:?}", x.await.unwrap());
     }
 }

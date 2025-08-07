@@ -3,7 +3,7 @@ use alloy::primitives::{Address, B256, U64};
 
 use super::types::{Log, RawJsonResponse};
 
-use super::lib::{find_field, unsafe_hex_to_address, hex_to_b256, hex_to_u64};
+use super::lib::{find_bool_field, find_field, hex_to_b256, hex_to_u64, unsafe_hex_to_address};
 
 #[derive(Debug)]
 pub struct RawLog<'a> {
@@ -17,6 +17,7 @@ pub struct RawLog<'a> {
     tx_hash: (usize, usize),
     tx_index: (usize, usize),
     log_index: (usize, usize),
+    removed: (usize, usize),
 }
 
 #[derive(Debug)]
@@ -124,6 +125,7 @@ impl<'a> RawLog<'a> {
         let tx_hash = find_field(input, b"\"transactionHash\":\"", b"\"")?;
         let tx_index = find_field(input, b"\"transactionIndex\":\"", b"\"")?;
         let log_index = find_field(input, b"\"logIndex\":\"", b"\"")?;
+        let removed = find_bool_field(input, b"\"removed\":")?;
 
         Some(Self {
             data: input,
@@ -135,6 +137,7 @@ impl<'a> RawLog<'a> {
             tx_hash,
             tx_index,
             log_index,
+            removed,
         })
     }
 
@@ -191,6 +194,14 @@ impl<'a> RawLog<'a> {
     }
 
     #[inline]
+    pub fn removed(&self) -> bool {
+        match self.data[self.removed.0] {
+            b't' | b'T' => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
     pub fn to_log(&self) -> Log {
         Log {
             address: self.address(),
@@ -201,8 +212,7 @@ impl<'a> RawLog<'a> {
             transaction_hash: Some(self.transaction_hash()),
             transaction_index: Some(self.transaction_index()),
             log_index: Some(self.log_index()),
-            //ISSSUE: This is not correct
-            removed: Some(false),
+            removed: Some(self.removed()),
         }
     }
 }
@@ -238,4 +248,19 @@ pub fn parse_logs(input: &[u8]) -> Vec<Log> {
     };
 
     response.logs().map(|l| l.to_log()).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_removed_field() {
+        // minimal JSON structure mimicking eth_getLogs response
+        let json = br#"{"jsonrpc":"2.0","result":[{"address":"0x0000000000000000000000000000000000000000","topics":["0x0000000000000000000000000000000000000000000000000000000000000000","0x0000000000000000000000000000000000000000000000000000000000000000","0x0000000000000000000000000000000000000000000000000000000000000000","0x0000000000000000000000000000000000000000000000000000000000000000"],"data":"0x","blockNumber":"0x1","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionIndex":"0x0","logIndex":"0x0","removed":true}],"id":1}"#;
+
+        let logs = parse_logs(json);
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].removed, Some(true));
+    }
 }

@@ -3,9 +3,9 @@ use alloy::primitives::{Address, B256, U256, U64};
 #[inline]
 pub fn unsafe_hex_to_address(hex: &[u8]) -> Address {
     let mut bytes = [0u8; 20];
-  
+
     // Skip 0x
-    let hex_ptr = unsafe {hex.as_ptr().add(2)};
+    let hex_ptr = unsafe { hex.as_ptr().add(2) };
     let out_ptr = bytes.as_mut_ptr();
 
     unsafe {
@@ -15,14 +15,14 @@ pub fn unsafe_hex_to_address(hex: &[u8]) -> Address {
                 b @ b'0'..=b'9' => b - b'0',
                 b @ b'a'..=b'f' => b - b'a' + 10,
                 b @ b'A'..=b'F' => b - b'A' + 10,
-                _ => 0, 
+                _ => 0,
             };
 
             let low = match *hex_ptr.add(sum + 1) {
                 b @ b'0'..=b'9' => b - b'0',
                 b @ b'a'..=b'f' => b - b'a' + 10,
                 b @ b'A'..=b'F' => b - b'A' + 10,
-                _ => 0, 
+                _ => 0,
             };
 
             *out_ptr.add(i) = (high << 4) | low;
@@ -35,7 +35,6 @@ pub fn unsafe_hex_to_address(hex: &[u8]) -> Address {
 #[inline]
 pub fn unsafe_hex_to_b256(hex: &[u8]) -> B256 {
     let mut bytes = [0u8; 32];
-
 
     let hex_ptr = hex.as_ptr();
     let out_ptr = bytes.as_mut_ptr();
@@ -162,5 +161,16 @@ pub fn find_field(data: &[u8], prefix: &[u8], suffix: &[u8]) -> Option<(usize, u
     let start = memchr::memmem::find(data, prefix)?;
     let start = start + prefix.len();
     let end = start + memchr::memmem::find(&data[start..], suffix)?;
+    Some((start, end))
+}
+
+#[inline]
+pub fn find_bool_field(data: &[u8], prefix: &[u8]) -> Option<(usize, usize)> {
+    let start = memchr::memmem::find(data, prefix)? + prefix.len();
+    let end = if data.get(start)? == &b't' {
+        start + 4
+    } else {
+        start + 5
+    };
     Some((start, end))
 }

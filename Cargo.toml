@@ -43,3 +43,15 @@ debug = true
 [[bench]]
  name="rpc"
  harness = false
+
+[[bench]]
+ name="diagnostic" 
+ harness = false
+
+[[bench]]
+ name="network_optimized"
+ harness = false
+
+[[bench]]
+ name="alloy_vs_palantiri"
+ harness = false

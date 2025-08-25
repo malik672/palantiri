@@ -16,7 +16,7 @@ pub struct HttpTransport {
     timeout: Duration,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum RpcError {
     #[error("Transport error: {0}")]
     Transport(String),

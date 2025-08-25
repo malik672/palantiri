@@ -10,20 +10,25 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
 }
 
 pub struct TransportBuilder {
-    url:  &'static str,
+    urls: Vec<&'static str>,
     timeout: Duration,
     max_retries: u32,
     pool_max_idle: u32,
 }
 
 impl TransportBuilder {
-    pub fn new(url:  &'static str) -> Self {
+    pub fn new(url: &'static str) -> Self {
         Self {
-            url,
+            urls: vec![url],
             timeout: Duration::from_secs(10),
             max_retries: 3,
             pool_max_idle: 32,
         }
+    }
+
+    pub fn with_fallbacks(mut self, additional_urls: Vec<&'static str>) -> Self {
+        self.urls.extend(additional_urls);
+        self
     }
 
     pub fn timeout(mut self, timeout: Duration) -> Self {
@@ -42,11 +47,15 @@ impl TransportBuilder {
     }
 
     pub fn build_http(self) -> HttpTransport {
-        HttpTransport::new(self.url)
+        HttpTransport::new(self.urls[0])
     }
 
     pub fn build_http_hyper(self) -> HyperTransport {
-        HyperTransport::new(self.url)
+        if self.urls.len() > 1 {
+            HyperTransport::new_with_fallbacks(self.urls[0], self.urls[1..].to_vec())
+        } else {
+            HyperTransport::new(self.urls[0])
+        }
     }
 
     pub fn build_http_with_config(self, param: HttpTransport) -> HttpTransport {

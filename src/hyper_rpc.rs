@@ -7,6 +7,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+use std::any::Any;
+use tokio::sync::Mutex;
 
 use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
@@ -19,22 +23,38 @@ use crate::parser::{
 use super::*;
 
 #[async_trait]
-pub trait Transport: Send + Sync + std::fmt::Debug {
+pub trait Transport: Send + Sync + std::fmt::Debug + Any {
     async fn hyper_execute_raw(&self, request: &'static [u8]) -> Result<Vec<u8>, RpcError>;
     async fn hyper_execute(&self, request: String) -> Result<String, RpcError>;
+    async fn hyper_execute_bytes(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError>;
 }
 
 pub enum BlockIdentifier {
     Hash(B256),
     Number(u64),
 }
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+struct CacheEntry {
+    data: Vec<u8>,
+    timestamp: Instant,
+}
+
+#[derive(Debug)]
+struct BatchingStats {
+    optimal_batch_size: usize,
+    last_batch_time: Duration,
+    samples: Vec<(usize, Duration)>, // (batch_size, duration)
+}
+
+#[derive(Debug, Clone)]  
 pub struct RpcClient {
     pub transport: Arc<dyn Transport>,
+    cache: Arc<Mutex<HashMap<String, CacheEntry>>>,
+    batching_stats: Arc<std::sync::Mutex<BatchingStats>>,
 }
 
 /// Represents an RPC request to a Ethereum node
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RpcRequest {
     pub jsonrpc: &'static str,
     pub method: &'static str,
@@ -46,7 +66,22 @@ impl RpcClient {
     pub fn new<T: Transport + 'static>(transport: T) -> Self {
         Self {
             transport: Arc::new(transport),
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            batching_stats: Arc::new(std::sync::Mutex::new(BatchingStats {
+                optimal_batch_size: 5, // Start with conservative batch size
+                last_batch_time: Duration::from_millis(500),
+                samples: Vec::new(),
+            })),
         }
+    }
+
+    fn get_cache_key(&self, request: &RpcRequest) -> String {
+        format!("{}:{}", request.method, serde_json::to_string(&request.params).unwrap_or_default())
+    }
+
+    fn should_cache(&self, method: &str) -> bool {
+        // Cache block requests for recent blocks (they change rarely)
+        matches!(method, "eth_getBlockByNumber" | "eth_getBlockByHash" | "eth_getTransactionByHash")
     }
 
     pub async fn get_chain_id(&self) -> Result<U64, RpcError> {
@@ -221,7 +256,7 @@ impl RpcClient {
         }
     }
 
-    /// fethces the block by number
+    /// fethces the block by number with smart prefetching
     pub async fn get_block_by_number(
         &self,
         number: u64,
@@ -236,10 +271,119 @@ impl RpcClient {
 
         let response_bytes: Vec<u8> = self.execute_raw(request).await?;
 
+        // Trigger predictive prefetching in background
+        self.maybe_prefetch_adjacent_blocks(number, full_tx);
+
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
             None => Ok(None),
         }
+    }
+
+    fn maybe_prefetch_adjacent_blocks(&self, current_block: u64, full_tx: bool) {
+        // Predictively fetch next few blocks in background
+        // This is especially useful for scanning applications
+        let rpc_clone = self.clone();
+        tokio::spawn(async move {
+            for offset in 1..=3 {
+                if current_block >= offset {
+                    let prev_block = current_block - offset;
+                    let request = RpcRequest {
+                        jsonrpc: "2.0",
+                        method: "eth_getBlockByNumber",
+                        params: json!([format!("0x{:x}", prev_block), full_tx]),
+                        id: 1,
+                    };
+                    
+                    // Only prefetch if not already cached
+                    let cache_key = rpc_clone.get_cache_key(&request);
+                    let should_fetch = {
+                        let cache_result = rpc_clone.cache.try_lock();
+                        match cache_result {
+                            Ok(cache) => !cache.contains_key(&cache_key),
+                            Err(_) => false,
+                        }
+                    };
+                    
+                    if should_fetch {
+                        let _ = rpc_clone.execute_raw(request).await;
+                    }
+                }
+                
+                // Also prefetch next blocks for forward scanning
+                let next_block = current_block + offset;
+                let request = RpcRequest {
+                    jsonrpc: "2.0",
+                    method: "eth_getBlockByNumber", 
+                    params: json!([format!("0x{:x}", next_block), full_tx]),
+                    id: 1,
+                };
+                
+                let cache_key = rpc_clone.get_cache_key(&request);
+                let should_fetch = {
+                    let cache_result = rpc_clone.cache.try_lock();
+                    match cache_result {
+                        Ok(cache) => !cache.contains_key(&cache_key),
+                        Err(_) => false,
+                    }
+                };
+                
+                if should_fetch {
+                    let _ = rpc_clone.execute_raw(request).await;
+                }
+            }
+        });
+    }
+
+    /// Fetch multiple blocks in a single batch request - much faster for recent blocks
+    pub async fn get_blocks_by_numbers(
+        &self,
+        numbers: Vec<u64>,
+        full_tx: bool,
+    ) -> Result<Vec<Option<Block>>, RpcError> {
+        if numbers.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let requests: Vec<RpcRequest> = numbers
+            .iter()
+            .enumerate()
+            .map(|(i, &number)| RpcRequest {
+                jsonrpc: "2.0",
+                method: "eth_getBlockByNumber",
+                params: json!([format!("0x{:x}", number), full_tx]),
+                id: i as u64 + 1,
+            })
+            .collect();
+
+        let response_bytes = self.execute_batch_raw(requests).await?;
+        
+        // Parse batch response - it should be a JSON array
+        let batch_results: Vec<serde_json::Value> = serde_json::from_slice(&response_bytes)
+            .map_err(|e| RpcError::Parse(format!("Failed to parse batch response: {}", e)))?;
+
+        let mut blocks = Vec::with_capacity(numbers.len());
+        
+        for result in batch_results {
+            if let Some(result_data) = result.get("result") {
+                if result_data.is_null() {
+                    blocks.push(None);
+                } else {
+                    // Convert back to bytes for our zero-copy parser
+                    let result_bytes = serde_json::to_vec(result_data)
+                        .map_err(|e| RpcError::Parse(e.to_string()))?;
+                    
+                    match parse_block(&result_bytes) {
+                        Some(block) => blocks.push(Some(block)),
+                        None => blocks.push(None),
+                    }
+                }
+            } else {
+                blocks.push(None);
+            }
+        }
+
+        Ok(blocks)
     }
 
     ///this just extracts the header of the block
@@ -587,20 +731,196 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        let request_str = format!(
-            r#"{{"jsonrpc":"{}","method":"{}","params":{},"id":{}}}"#,
-            request.jsonrpc, request.method, request.params, request.id
-        );
+        let cache_key = self.get_cache_key(&request);
+        
+        // Check cache first if this request type should be cached
+        if self.should_cache(request.method) {
+            if let Ok(mut cache) = self.cache.try_lock() {
+                if let Some(entry) = cache.get(&cache_key) {
+                    // Cache entries expire after 30 seconds for recent blocks
+                    if entry.timestamp.elapsed() < Duration::from_secs(30) {
+                        return Ok(entry.data.clone());
+                    } else {
+                        cache.remove(&cache_key);
+                    }
+                }
+            }
+        }
 
-        // SAFETY: `request_str` is guaranteed to live until hyper_execute_raw completes.
-        // hyper_execute_raw only uses the data for the HTTP request and doesn't store
-        // the reference beyond its execution.
-        // The scope here ensures that execute_raw awaits the completion of hyper_execute_raw before request_str (and thus the underlying bytes) is dropped.
-        let static_ref: &'static [u8] =
-            unsafe { std::slice::from_raw_parts(request_str.as_ptr(), request_str.len()) };
+        self.execute_raw_internal(request).await
+    }
 
-        let response = self.transport.hyper_execute_raw(static_ref).await?;
+    async fn execute_raw_internal(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
+        // Pre-allocate with larger capacity based on typical request sizes
+        let mut buffer = Vec::with_capacity(512);
+        
+        // Build JSON more efficiently
+        buffer.extend_from_slice(b"{\"jsonrpc\":\"");
+        buffer.extend_from_slice(request.jsonrpc.as_bytes());
+        buffer.extend_from_slice(b"\",\"method\":\"");
+        buffer.extend_from_slice(request.method.as_bytes());
+        buffer.extend_from_slice(b"\",\"params\":");
+        
+        // Serialize params directly into buffer - this is already optimal
+        serde_json::to_writer(&mut buffer, &request.params)
+            .map_err(|e| RpcError::Parse(e.to_string()))?;
+            
+        buffer.extend_from_slice(b",\"id\":");
+        
+        // Optimize integer writing
+        let id_str = request.id.to_string();
+        buffer.extend_from_slice(id_str.as_bytes());
+        buffer.push(b'}');
 
+        // Use a safer approach - create new transport method that takes Vec<u8>
+        let response = self.transport.hyper_execute_bytes(buffer).await?;
+
+        // Cache the response if appropriate
+        if self.should_cache(request.method) {
+            let cache_key = self.get_cache_key(&request);
+            
+            if let Ok(mut cache) = self.cache.try_lock() {
+                cache.insert(cache_key, CacheEntry {
+                    data: response.clone(),
+                    timestamp: Instant::now(),
+                });
+                
+                // Clean old entries occasionally (keep cache size manageable)
+                if cache.len() > 1000 {
+                    let now = Instant::now();
+                    cache.retain(|_, entry| now.duration_since(entry.timestamp) < Duration::from_secs(300));
+                }
+            }
+        }
+
+        Ok(response)
+    }
+
+    /// Execute multiple RPC requests in a single batch call
+    pub async fn execute_batch_raw(&self, requests: Vec<RpcRequest>) -> Result<Vec<u8>, RpcError> {
+        if requests.is_empty() {
+            return Err(RpcError::Parse("Empty batch request".into()));
+        }
+        
+        if requests.len() == 1 {
+            return self.execute_raw(requests.into_iter().next().unwrap()).await;
+        }
+
+        let start_time = Instant::now();
+        let batch_size = requests.len();
+
+        // Determine if we should use concurrent multiplexed requests or single batch
+        let use_multiplexing = {
+            let stats = self.batching_stats.lock().unwrap();
+            // Use multiplexing for smaller batches where connection overhead is amortized
+            batch_size <= 10 && stats.optimal_batch_size > batch_size * 2
+        };
+
+        if use_multiplexing {
+            // Use connection multiplexing for concurrent individual requests
+            let individual_requests: Vec<Vec<u8>> = requests
+                .iter()
+                .map(|req| {
+                    format!(
+                        r#"{{"jsonrpc":"{}","method":"{}","params":{},"id":{}}}"#,
+                        req.jsonrpc, req.method, req.params, req.id
+                    ).into_bytes()
+                })
+                .collect();
+
+            // Try to cast transport to HyperTransport to use batch multiplexing
+            if let Some(hyper_transport) = (&*self.transport as &dyn std::any::Any)
+                .downcast_ref::<crate::hyper_transport::HyperTransport>() 
+            {
+                let results = hyper_transport.hyper_execute_bytes_batch(individual_requests).await
+                    .map_err(|e| RpcError::Transport(format!("Multiplexed batch failed: {}", e)))?;
+                
+                // Combine successful results into a JSON array
+                let mut response_array = Vec::new();
+                response_array.push(b'[');
+                
+                let mut first = true;
+                for result in results {
+                    match result {
+                        Ok(response_bytes) => {
+                            if !first {
+                                response_array.push(b',');
+                            }
+                            response_array.extend_from_slice(&response_bytes);
+                            first = false;
+                        }
+                        Err(_) => {
+                            // Skip failed requests in multiplexed mode
+                            continue;
+                        }
+                    }
+                }
+                
+                response_array.push(b']');
+                
+                // Update batching stats with multiplexing performance
+                let elapsed = start_time.elapsed();
+                {
+                    let mut stats = self.batching_stats.lock().unwrap();
+                    stats.samples.push((batch_size, elapsed));
+                    if stats.samples.len() > 20 {
+                        stats.samples.remove(0);
+                    }
+                }
+                
+                return Ok(response_array);
+            }
+        }
+
+        // Fallback to standard JSON-RPC batch request
+        let mut buffer = Vec::with_capacity(requests.len() * 512);
+        buffer.push(b'[');
+        
+        for (i, request) in requests.iter().enumerate() {
+            if i > 0 {
+                buffer.push(b',');
+            }
+            
+            buffer.extend_from_slice(b"{\"jsonrpc\":\"");
+            buffer.extend_from_slice(request.jsonrpc.as_bytes());
+            buffer.extend_from_slice(b"\",\"method\":\"");
+            buffer.extend_from_slice(request.method.as_bytes());
+            buffer.extend_from_slice(b"\",\"params\":");
+            
+            serde_json::to_writer(&mut buffer, &request.params)
+                .map_err(|e| RpcError::Parse(e.to_string()))?;
+                
+            buffer.extend_from_slice(b",\"id\":");
+            let id_str = request.id.to_string();
+            buffer.extend_from_slice(id_str.as_bytes());
+            buffer.push(b'}');
+        }
+        
+        buffer.push(b']');
+        
+        let response = self.transport.hyper_execute_bytes(buffer).await?;
+        
+        // Update batching performance stats
+        let elapsed = start_time.elapsed();
+        {
+            let mut stats = self.batching_stats.lock().unwrap();
+            stats.last_batch_time = elapsed;
+            stats.samples.push((batch_size, elapsed));
+            if stats.samples.len() > 20 {
+                stats.samples.remove(0);
+            }
+            
+            // Recalculate optimal batch size based on recent samples
+            if stats.samples.len() >= 5 {
+                let avg_time_per_request: f64 = stats.samples.iter()
+                    .map(|(size, duration)| duration.as_millis() as f64 / *size as f64)
+                    .sum::<f64>() / stats.samples.len() as f64;
+                
+                // Optimal batch size balances latency vs throughput
+                stats.optimal_batch_size = ((500.0 / avg_time_per_request) as usize).clamp(1, 20);
+            }
+        }
+        
         Ok(response)
     }
 

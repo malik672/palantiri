@@ -80,10 +80,16 @@ impl<'a> RawBlock<'a> {
         // }
 
         
-        // Estimate transaction count for efficient allocation
-        /*Now this is quite normal we hit ,ore 500 than 32 so removing the branch is cool is here */
-        // let tx_capacity = if input.len() > 100_000 {println!("mogged"); 500 } else {  println!("Estimated transaction count"); 32 };
-        let mut transactions = Vec::with_capacity(500);
+        // Estimate transaction count based on response size - newer blocks are much larger
+        let tx_capacity = if input.len() > 500_000 {
+            1500  // Large modern blocks can have 300+ transactions
+        } else if input.len() > 200_000 {
+            800   // Medium blocks
+        } else {
+            400   // Smaller blocks
+        };
+        
+        let mut transactions = Vec::with_capacity(tx_capacity);
         let mut uncles = Vec::with_capacity(2); 
         
         // Parse transaction array - only if we need it

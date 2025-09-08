@@ -5,6 +5,7 @@ pub mod transport;
 pub mod parser;
 pub mod hyper_transport;
 pub mod hyper_rpc;
+pub mod reqwest_transport;
 
 
 
@@ -16,7 +17,7 @@ pub struct HttpTransport {
     timeout: Duration,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum RpcError {
     #[error("Transport error: {0}")]
     Transport(String),

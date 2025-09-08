@@ -89,8 +89,18 @@ pub fn hex_to_u64(hex: &[u8]) -> U64 {
         let out_ptr = bytes.as_mut_ptr();
 
         for i in 0..byte_len {
-            let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
-            let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
+            let high = match *hex_ptr.add(i * 2) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0,
+            };
+            let low = match *hex_ptr.add(i * 2 + 1) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0,
+            };
             *out_ptr.add(start_idx + i) = (high << 4) | low;
         }
     }
@@ -148,8 +158,18 @@ pub fn hex_to_u256(hex: &[u8]) -> U256 {
         let out_ptr = bytes.as_mut_ptr();
 
         for i in 0..byte_len {
-            let high = (*hex_ptr.add(i * 2) as char).to_digit(16).unwrap_or(0) as u8;
-            let low = (*hex_ptr.add(i * 2 + 1) as char).to_digit(16).unwrap_or(0) as u8;
+            let high = match *hex_ptr.add(i * 2) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0,
+            };
+            let low = match *hex_ptr.add(i * 2 + 1) {
+                b @ b'0'..=b'9' => b - b'0',
+                b @ b'a'..=b'f' => b - b'a' + 10,
+                b @ b'A'..=b'F' => b - b'A' + 10,
+                _ => 0,
+            };
             *out_ptr.add(start_idx + i) = (high << 4) | low;
         }
     }

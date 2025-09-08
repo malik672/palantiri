@@ -1,10 +1,12 @@
-use alloy::hex;
-use alloy::primitives::{Address, B256, U256, U64};
+use alloy::{
+    hex,
+    primitives::{Address, B256, U256, U64},
+};
 
-use super::types::RawJsonResponse;
-use super::types::TransactionTx;
-
-use super::lib::{find_field, unsafe_hex_to_address, hex_to_b256, hex_to_u256, hex_to_u64};
+use super::{
+    lib::{find_field, hex_to_b256, hex_to_u256, hex_to_u64, unsafe_hex_to_address},
+    types::{RawJsonResponse, TransactionTx},
+};
 
 #[derive(Debug)]
 pub struct RawTx<'a> {
@@ -164,7 +166,7 @@ impl<'a> RawJsonResponse<'a> {
             match input[pos] {
                 b'{' => depth += 1,
                 b'}' => depth -= 1,
-                _ => {}
+                _ => {},
             }
             pos += 1;
         }

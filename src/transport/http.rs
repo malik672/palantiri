@@ -1,7 +1,10 @@
-use async_trait::async_trait;
 use std::time::Duration;
 
-use crate::{hyper_transport::HyperTransport, reqwest_transport::ReqwestTransport, HttpTransport, RpcError};
+use async_trait::async_trait;
+
+use crate::{
+    hyper_transport::HyperTransport, reqwest_transport::ReqwestTransport, HttpTransport, RpcError,
+};
 
 #[async_trait]
 pub trait Transport: Send + Sync + std::fmt::Debug {
@@ -65,7 +68,7 @@ impl TransportBuilder {
     pub fn build_reqwest(self) -> ReqwestTransport {
         ReqwestTransport::new(self.urls[0])
     }
-    
+
     pub fn build_reqwest_minimal(self) -> ReqwestTransport {
         ReqwestTransport::new_minimal(self.urls[0])
     }

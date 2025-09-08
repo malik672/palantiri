@@ -1,9 +1,12 @@
-use alloy::hex;
-use alloy::primitives::{Address, B256, U64};
+use alloy::{
+    hex,
+    primitives::{Address, B256, U64},
+};
 
-use super::types::{Log, RawJsonResponse};
-
-use super::lib::{find_field, unsafe_hex_to_address, hex_to_b256, hex_to_u64};
+use super::{
+    lib::{find_field, hex_to_b256, hex_to_u64, unsafe_hex_to_address},
+    types::{Log, RawJsonResponse},
+};
 
 #[derive(Debug)]
 pub struct RawLog<'a> {
@@ -39,7 +42,7 @@ impl<'a> RawJsonResponse<'a> {
             match input[end] {
                 b'[' => depth += 1,
                 b']' => depth -= 1,
-                _ => {}
+                _ => {},
             }
             end += 1;
         }
@@ -201,7 +204,7 @@ impl<'a> RawLog<'a> {
             transaction_hash: Some(self.transaction_hash()),
             transaction_index: Some(self.transaction_index()),
             log_index: Some(self.log_index()),
-            //ISSSUE: This is not correct
+            // ISSSUE: This is not correct
             removed: Some(false),
         }
     }
@@ -214,7 +217,7 @@ fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
 
     unsafe {
         let mut current = pos;
-        for i in 0..4 {
+        for item in &mut result {
             while data.get_unchecked(current) != &b'"' {
                 current += 1;
             }
@@ -222,7 +225,7 @@ fn parse_topics_array(data: &[u8]) -> Option<[(usize, usize); 4]> {
             current += 1;
 
             // Each topic is exactly 66 bytes (including 0x)
-            result[i] = (current, current + 66);
+            *item = (current, current + 66);
             // skip topic and closing quote
             current += 67;
         }

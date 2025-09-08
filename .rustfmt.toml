@@ -1,0 +1,17 @@
+# Rustfmt configuration for consistent code formatting
+
+# Basic formatting (stable options only)
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+
+# Function calls and arguments
+fn_call_width = 80
+
+# Chains and closures
+chain_width = 80
+
+# Misc
+match_block_trailing_comma = true
+use_field_init_shorthand = true
+use_try_shorthand = true

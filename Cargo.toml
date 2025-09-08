@@ -33,7 +33,7 @@ thiserror = "2.0.12"
 tokio = {version = "1.42.0", features = ["rt-multi-thread", "full"]}
 tower = { version = "0.5.2", features = ["limit"] }
 tracing = "0.1.41"
-trust-dns-resolver = "0.23.2"
+hickory-resolver = "0.24"
 webpki-roots = "0.26.10"
 
 

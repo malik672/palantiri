@@ -1,5 +1,9 @@
-use super::lib::{find_field, hex_to_b256, hex_to_u256, hex_to_u64, unsafe_hex_to_address, unsafe_hex_to_b256};
-use super::types::Block;
+use super::{
+    lib::{
+        find_field, hex_to_b256, hex_to_u256, hex_to_u64, unsafe_hex_to_address, unsafe_hex_to_b256,
+    },
+    types::Block,
+};
 
 // Field indices for fast lookup
 const FIELD_COUNT: usize = 17;
@@ -64,7 +68,7 @@ impl<'a> RawBlock<'a> {
         // Use a bitfield to track which fields are present (faster than Option<>)
         let mut fields_present: u32 = 0;
         let mut fields = [(0, 0); FIELD_COUNT];
-        
+
         // Parse all fields in one batch operation
         for (idx, &(prefix, suffix)) in FIELD_PATTERNS.iter().enumerate() {
             if let Some(range) = find_field(input, prefix, suffix) {
@@ -72,30 +76,30 @@ impl<'a> RawBlock<'a> {
                 fields_present |= 1 << idx;
             }
         }
-        
-        /*This should be returned one day but for a perfect block we never hit this */
-        // if (fields_present & ((1 << NUMBER) | (1 << HASH))) != ((1 << NUMBER) | (1 << HASH)) {
-        //     println!("Missing required fields: number or hash");
+
+        // This should be returned one day but for a perfect block we never hit this
+        // if (fields_present & ((1 << NUMBER) | (1 << HASH))) != ((1 << NUMBER) | (1 <<
+        // HASH)) {     println!("Missing required fields: number or hash");
         //     return None;
         // }
 
-        
-        // Estimate transaction count based on response size - newer blocks are much larger
+        // Estimate transaction count based on response size - newer blocks are much
+        // larger
         let tx_capacity = if input.len() > 500_000 {
-            1500  // Large modern blocks can have 300+ transactions
+            1500 // Large modern blocks can have 300+ transactions
         } else if input.len() > 200_000 {
-            800   // Medium blocks
+            800 // Medium blocks
         } else {
-            400   // Smaller blocks
+            400 // Smaller blocks
         };
-        
+
         let mut transactions = Vec::with_capacity(tx_capacity);
-        let mut uncles = Vec::with_capacity(2); 
-        
+        let mut uncles = Vec::with_capacity(2);
+
         // Parse transaction array - only if we need it
         Self::parse_transactions_array(input, &mut transactions);
         Self::parse_uncles_array(input, &mut uncles);
-        
+
         Some(Self {
             data: input,
             fields,
@@ -110,7 +114,7 @@ impl<'a> RawBlock<'a> {
         // Use our existing find_field to locate the transactions array start
         if let Some(start) = memchr::memmem::find(data, b"\"transactions\":[") {
             let mut pos = start + b"\"transactions\":[".len();
-            
+
             // Single-pass extraction of all transaction hashes
             let len = data.len();
             while pos < data.len() {
@@ -118,21 +122,21 @@ impl<'a> RawBlock<'a> {
                 while pos < len && (data[pos] == b' ' || data[pos] == b',' || data[pos] == b'\n') {
                     pos += 1;
                 }
-                
+
                 if pos >= len || data[pos] == b']' {
                     break;
                 }
-                
+
                 // Only process string values (transaction hashes)
                 if data[pos] == b'"' {
-                    pos += 1; 
+                    pos += 1;
                     let tx_start = pos;
-                    
+
                     // Find closing quote efficiently using memchr
                     if let Some(end_offset) = memchr::memchr(b'"', &data[pos..]) {
                         let tx_end = pos + end_offset;
                         result.push((tx_start, tx_end));
-                        pos = tx_end + 1; 
+                        pos = tx_end + 1;
                     } else {
                         break;
                     }
@@ -152,21 +156,23 @@ impl<'a> RawBlock<'a> {
         // Similar approach as transactions array but for uncles
         if let Some(start) = memchr::memmem::find(data, b"\"uncles\":[") {
             let mut pos = start + b"\"uncles\":[".len();
-            
+
             while pos < data.len() {
                 // Skip whitespace and commas
-                while pos < data.len() && (data[pos] == b' ' || data[pos] == b',' || data[pos] == b'\n') {
+                while pos < data.len()
+                    && (data[pos] == b' ' || data[pos] == b',' || data[pos] == b'\n')
+                {
                     pos += 1;
                 }
-                
+
                 if pos >= data.len() || data[pos] == b']' {
                     break;
                 }
-                
+
                 if data[pos] == b'"' {
                     pos += 1; // Skip opening quote
                     let uncle_start = pos;
-                    
+
                     if let Some(end_offset) = memchr::memchr(b'"', &data[pos..]) {
                         let uncle_end = pos + end_offset;
                         result.push((uncle_start, uncle_end));
@@ -191,10 +197,10 @@ impl<'a> RawBlock<'a> {
                 let (start, end) = self.fields[idx];
                 &self.data[start..end]
             } else {
-                b"0x0" 
+                b"0x0"
             }
         };
-        
+
         Block {
             number: hex_to_u64(get_field(NUMBER)),
             hash: Some(hex_to_b256(get_field(HASH))),
@@ -215,14 +221,12 @@ impl<'a> RawBlock<'a> {
             base_fee_per_gas: Some(hex_to_u256(get_field(BASE_FEE_PER_GAS))),
             prev_randao: None,
             // Process transactions and uncles as needed
-            transactions: self.transactions
+            transactions: self
+                .transactions
                 .iter()
                 .map(|&(s, e)| hex_to_b256(&self.data[s..e]))
                 .collect(),
-            uncles: self.uncles
-                .iter()
-                .map(|&(s, e)| hex_to_b256(&self.data[s..e ]))
-                .collect(),
+            uncles: self.uncles.iter().map(|&(s, e)| hex_to_b256(&self.data[s..e])).collect(),
         }
     }
 }
@@ -234,7 +238,7 @@ impl<'a> RawJsonResponse<'a> {
         if memchr::memmem::find(input, b"\"result\":null").is_some() {
             return None;
         }
-        
+
         // Find result object
         let start = memchr::memmem::find(input, b"\"result\":{")?;
         let start = start + 9;
@@ -242,13 +246,13 @@ impl<'a> RawJsonResponse<'a> {
         // Fast bracket matching to find the end of the result object
         let mut pos = start;
         let mut depth = 1;
-        
+
         // Single-pass bracket matching - most efficient way
         while depth > 0 && pos < input.len() {
             match input[pos] {
                 b'{' => depth += 1,
                 b'}' => depth -= 1,
-                _ => {}
+                _ => {},
             }
             pos += 1;
         }

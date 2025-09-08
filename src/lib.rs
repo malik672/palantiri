@@ -1,18 +1,17 @@
-use reqwest::Client;
 use std::time::Duration;
 
-pub mod transport;
-pub mod parser;
-pub mod hyper_transport;
+use reqwest::Client;
+
 pub mod hyper_rpc;
+pub mod hyper_transport;
+pub mod parser;
 pub mod reqwest_transport;
-
-
+pub mod transport;
 
 #[derive(Debug)]
 pub struct HttpTransport {
     client: Client,
-    urls:  &'static str,
+    urls: &'static str,
     current_url: usize,
     timeout: Duration,
 }
@@ -58,5 +57,3 @@ impl HttpTransport {
         self
     }
 }
-
-

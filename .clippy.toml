@@ -1,0 +1,30 @@
+# Clippy configuration for enhanced linting
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
+
+# Documentation requirements
+missing-docs-in-crate-items = false
+
+# Allowed complexity for types
+type-complexity-threshold = 250
+
+# String literal length limit
+max-suggested-slice-pattern-length = 3
+
+# Avoid specific lints that might be too strict
+avoid-breaking-exported-api = false
+
+# Function parameters threshold
+max-fn-params-bools = 3
+too-many-arguments-threshold = 7
+
+# Size thresholds
+trivial-copy-size-limit = 128
+pass-by-value-size-limit = 256
+
+# Allow some common patterns
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true

@@ -1,26 +1,22 @@
-use std::time::Duration;
-use std::sync::{Arc, OnceLock};
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::header::HeaderValue;
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::rt::TokioExecutor;
-use tokio::sync::{Mutex, Semaphore, oneshot};
-use tracing::{debug, info, warn};
+use tokio::sync::{oneshot, Mutex, Semaphore};
+use tracing::{debug, info};
 
-use crate::hyper_rpc::Transport;
-use crate::RpcError;
+use crate::{hyper_rpc::Transport, RpcError};
 
-const DURATION_TIMEOUT: Duration = std::time::Duration::from_secs(30);
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
-const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
-const MAX_IDLE_POOL: usize = 20;
-const TCP_KEEPALIVE: Duration = Duration::from_secs(60);
-const HAPPY_EYEBALLS_TIMEOUT: Duration = Duration::from_millis(100);
 const MAX_CONCURRENT_REQUESTS: usize = 100;
-const PIPELINE_BUFFER_SIZE: usize = 32;
 
 type HttpClient = hyper_util::client::legacy::Client<
     HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
@@ -42,6 +38,12 @@ pub struct RequestPipeline {
     semaphore: Arc<Semaphore>,
 }
 
+impl Default for RequestPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RequestPipeline {
     pub fn new() -> Self {
         Self {
@@ -52,7 +54,7 @@ impl RequestPipeline {
 
     pub async fn enqueue_request(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError> {
         let (tx, rx) = oneshot::channel();
-        
+
         {
             let mut queue = self.queue.lock().await;
             queue.push_back(PipelineRequest {
@@ -60,7 +62,7 @@ impl RequestPipeline {
                 response_sender: tx,
             });
         }
-        
+
         rx.await
             .map_err(|_| RpcError::Transport("Pipeline request cancelled".to_string()))?
     }
@@ -68,15 +70,15 @@ impl RequestPipeline {
     pub async fn start_processing(pipeline: Arc<RequestPipeline>, transport: HyperTransport) {
         let queue = pipeline.queue.clone();
         let semaphore = pipeline.semaphore.clone();
-        
+
         loop {
             let permit = semaphore.acquire().await.unwrap();
-            
+
             let request = {
                 let mut queue = queue.lock().await;
                 queue.pop_front()
             };
-            
+
             if let Some(pipeline_req) = request {
                 let transport = transport.clone();
                 // Execute synchronously instead of spawning to avoid lifetime issues
@@ -95,7 +97,6 @@ impl RequestPipeline {
 pub struct HyperTransport {
     client: Arc<HttpClient>,
     primary_url: &'static str,
-    fallback_urls: Vec<&'static str>,
     pipeline: Arc<RequestPipeline>,
 }
 
@@ -132,16 +133,18 @@ impl HyperTransport {
         });
 
         let pipeline = Arc::new(RequestPipeline::new());
-        
+
         Self {
             client: client.clone(),
             primary_url: url,
-            fallback_urls: Vec::new(),
             pipeline: pipeline.clone(),
         }
     }
 
-    pub fn new_with_fallbacks(primary_url: &'static str, fallback_urls: Vec<&'static str>) -> Self {
+    pub fn new_with_fallbacks(
+        primary_url: &'static str,
+        _fallback_urls: Vec<&'static str>,
+    ) -> Self {
         let client = CLIENT_POOL.get_or_init(|| {
             debug!("Creating shared HTTP client with fallbacks and pipelining");
 
@@ -173,18 +176,17 @@ impl HyperTransport {
         });
 
         let pipeline = Arc::new(RequestPipeline::new());
-        
+
         Self {
             client: client.clone(),
             primary_url,
-            fallback_urls,
             pipeline: pipeline.clone(),
         }
     }
 
     pub async fn execute_single_request(&self, request: &[u8]) -> Result<Vec<u8>, RpcError> {
         let body = http_body_util::Full::new(Bytes::copy_from_slice(request));
-        
+
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)
             .uri(self.primary_url)
@@ -203,36 +205,8 @@ impl HyperTransport {
         }
 
         let body = response.into_body();
-        let body_bytes = body.collect().await
-            .map_err(|e| RpcError::Transport(e.to_string()))?
-            .to_bytes();
-
-        Ok(body_bytes.into())
-    }
-
-    async fn try_request(&self, url: &str, request: &[u8]) -> Result<Vec<u8>, RpcError> {
-        let req = hyper::Request::builder()
-            .method(hyper::Method::POST)
-            .uri(url)
-            .header(hyper::header::CONTENT_TYPE, CONTENT_TYPE_JSON)
-            .header(hyper::header::CONNECTION, "keep-alive")
-            .body(http_body_util::Full::new(Bytes::copy_from_slice(request)))
-            .map_err(|e| RpcError::Transport(format!("Failed to build request: {}", e)))?;
-
-        let response = self
-            .client
-            .request(req)
-            .await
-            .map_err(|e| RpcError::Transport(format!("Request failed: {}", e)))?;
-
-        if !response.status().is_success() {
-            return Err(RpcError::Transport(format!("HTTP error {}", response.status())));
-        }
-
-        let body = response.into_body();
-        let body_bytes = body.collect().await
-            .map_err(|e| RpcError::Transport(e.to_string()))?
-            .to_bytes();
+        let body_bytes =
+            body.collect().await.map_err(|e| RpcError::Transport(e.to_string()))?.to_bytes();
 
         Ok(body_bytes.into())
     }
@@ -259,9 +233,8 @@ impl Transport for HyperTransport {
             .map_err(|e| RpcError::Transport(format!("Request failed: {}", e)))?;
 
         let body = response.into_body();
-        let body_bytes = body.collect().await
-            .map_err(|e| RpcError::Transport(e.to_string()))?
-            .to_bytes();
+        let body_bytes =
+            body.collect().await.map_err(|e| RpcError::Transport(e.to_string()))?.to_bytes();
 
         String::from_utf8(body_bytes.to_vec())
             .map_err(|e| RpcError::Response(format!("Invalid UTF-8 in response: {}", e)))
@@ -288,9 +261,8 @@ impl Transport for HyperTransport {
 
         // Direct body collection without intermediate conversion
         let body = response.into_body();
-        let body_bytes = body.collect().await
-            .map_err(|e| RpcError::Transport(e.to_string()))?
-            .to_bytes();
+        let body_bytes =
+            body.collect().await.map_err(|e| RpcError::Transport(e.to_string()))?.to_bytes();
 
         Ok(body_bytes.into())
     }
@@ -301,27 +273,30 @@ impl Transport for HyperTransport {
 }
 
 impl HyperTransport {
-    pub async fn hyper_execute_bytes_batch(&self, requests: Vec<Vec<u8>>) -> Result<Vec<Result<Vec<u8>, RpcError>>, RpcError> {
+    pub async fn hyper_execute_bytes_batch(
+        &self,
+        requests: Vec<Vec<u8>>,
+    ) -> Result<Vec<Result<Vec<u8>, RpcError>>, RpcError> {
         let mut handles = Vec::new();
-        
+
         for request in requests {
             let pipeline = self.pipeline.clone();
-            let handle = tokio::spawn(async move {
-                pipeline.enqueue_request(request).await
-            });
+            let handle = tokio::spawn(async move { pipeline.enqueue_request(request).await });
             handles.push(handle);
         }
-        
+
         let results = futures::future::join_all(handles).await;
         let mut responses = Vec::new();
-        
+
         for result in results {
             match result {
                 Ok(response) => responses.push(response),
-                Err(e) => responses.push(Err(RpcError::Transport(format!("Task join error: {}", e)))),
+                Err(e) => {
+                    responses.push(Err(RpcError::Transport(format!("Task join error: {}", e))))
+                },
             }
         }
-        
+
         Ok(responses)
     }
 }

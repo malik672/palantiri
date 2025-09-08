@@ -1,0 +1,33 @@
+# Rustfmt configuration for consistent code formatting
+
+# Basic formatting
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+
+# Imports
+imports_layout = "Mixed"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+
+# Comments and documentation
+normalize_comments = true
+normalize_doc_attributes = true
+wrap_comments = true
+comment_width = 80
+
+# Function calls and arguments
+fn_call_width = 80
+fn_single_line = true
+control_brace_style = "AlwaysSameLine"
+
+# Chains and closures
+chain_width = 80
+closure_block_indent_threshold = 10
+
+# Misc
+trailing_comma = "Vertical"
+match_block_trailing_comma = true
+trailing_semicolon = true
+use_field_init_shorthand = true
+use_try_shorthand = true

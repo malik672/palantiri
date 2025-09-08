@@ -8,19 +8,13 @@ use hyper::header::HeaderValue;
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::rt::TokioExecutor;
 use tokio::sync::{Mutex, Semaphore, oneshot};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::hyper_rpc::Transport;
 use crate::RpcError;
 
-const DURATION_TIMEOUT: Duration = std::time::Duration::from_secs(30);
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
-const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
-const MAX_IDLE_POOL: usize = 20;
-const TCP_KEEPALIVE: Duration = Duration::from_secs(60);
-const HAPPY_EYEBALLS_TIMEOUT: Duration = Duration::from_millis(100);
 const MAX_CONCURRENT_REQUESTS: usize = 100;
-const PIPELINE_BUFFER_SIZE: usize = 32;
 
 type HttpClient = hyper_util::client::legacy::Client<
     HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
@@ -95,7 +89,6 @@ impl RequestPipeline {
 pub struct HyperTransport {
     client: Arc<HttpClient>,
     primary_url: &'static str,
-    fallback_urls: Vec<&'static str>,
     pipeline: Arc<RequestPipeline>,
 }
 
@@ -136,12 +129,11 @@ impl HyperTransport {
         Self {
             client: client.clone(),
             primary_url: url,
-            fallback_urls: Vec::new(),
             pipeline: pipeline.clone(),
         }
     }
 
-    pub fn new_with_fallbacks(primary_url: &'static str, fallback_urls: Vec<&'static str>) -> Self {
+    pub fn new_with_fallbacks(primary_url: &'static str, _fallback_urls: Vec<&'static str>) -> Self {
         let client = CLIENT_POOL.get_or_init(|| {
             debug!("Creating shared HTTP client with fallbacks and pipelining");
 
@@ -177,7 +169,6 @@ impl HyperTransport {
         Self {
             client: client.clone(),
             primary_url,
-            fallback_urls,
             pipeline: pipeline.clone(),
         }
     }
@@ -210,32 +201,6 @@ impl HyperTransport {
         Ok(body_bytes.into())
     }
 
-    async fn try_request(&self, url: &str, request: &[u8]) -> Result<Vec<u8>, RpcError> {
-        let req = hyper::Request::builder()
-            .method(hyper::Method::POST)
-            .uri(url)
-            .header(hyper::header::CONTENT_TYPE, CONTENT_TYPE_JSON)
-            .header(hyper::header::CONNECTION, "keep-alive")
-            .body(http_body_util::Full::new(Bytes::copy_from_slice(request)))
-            .map_err(|e| RpcError::Transport(format!("Failed to build request: {}", e)))?;
-
-        let response = self
-            .client
-            .request(req)
-            .await
-            .map_err(|e| RpcError::Transport(format!("Request failed: {}", e)))?;
-
-        if !response.status().is_success() {
-            return Err(RpcError::Transport(format!("HTTP error {}", response.status())));
-        }
-
-        let body = response.into_body();
-        let body_bytes = body.collect().await
-            .map_err(|e| RpcError::Transport(e.to_string()))?
-            .to_bytes();
-
-        Ok(body_bytes.into())
-    }
 }
 
 #[async_trait]

@@ -7,10 +7,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use std::any::Any;
-use tokio::sync::Mutex;
 
 use crate::parser::block_parser::parse_block;
 use crate::parser::parser_for_small_response::Generic;
@@ -33,11 +31,6 @@ pub enum BlockIdentifier {
     Hash(B256),
     Number(u64),
 }
-#[derive(Debug)]
-struct CacheEntry {
-    data: Vec<u8>,
-    timestamp: Instant,
-}
 
 #[derive(Debug)]
 struct BatchingStats {
@@ -49,7 +42,6 @@ struct BatchingStats {
 #[derive(Debug, Clone)]  
 pub struct RpcClient {
     pub transport: Arc<dyn Transport>,
-    cache: Arc<Mutex<HashMap<String, CacheEntry>>>,
     batching_stats: Arc<std::sync::Mutex<BatchingStats>>,
 }
 
@@ -66,7 +58,6 @@ impl RpcClient {
     pub fn new<T: Transport + 'static>(transport: T) -> Self {
         Self {
             transport: Arc::new(transport),
-            cache: Arc::new(Mutex::new(HashMap::new())),
             batching_stats: Arc::new(std::sync::Mutex::new(BatchingStats {
                 optimal_batch_size: 5, // Start with conservative batch size
                 last_batch_time: Duration::from_millis(500),
@@ -75,14 +66,6 @@ impl RpcClient {
         }
     }
 
-    fn get_cache_key(&self, request: &RpcRequest) -> String {
-        format!("{}:{}", request.method, serde_json::to_string(&request.params).unwrap_or_default())
-    }
-
-    fn should_cache(&self, method: &str) -> bool {
-        // Cache block requests for recent blocks (they change rarely)
-        matches!(method, "eth_getBlockByNumber" | "eth_getBlockByHash" | "eth_getTransactionByHash")
-    }
 
     pub async fn get_chain_id(&self) -> Result<U64, RpcError> {
         let request = RpcRequest {
@@ -277,60 +260,6 @@ impl RpcClient {
         }
     }
 
-    fn maybe_prefetch_adjacent_blocks(&self, current_block: u64, full_tx: bool) {
-        // Predictively fetch next few blocks in background
-        // This is especially useful for scanning applications
-        let rpc_clone = self.clone();
-        tokio::spawn(async move {
-            for offset in 1..=3 {
-                if current_block >= offset {
-                    let prev_block = current_block - offset;
-                    let request = RpcRequest {
-                        jsonrpc: "2.0",
-                        method: "eth_getBlockByNumber",
-                        params: json!([format!("0x{:x}", prev_block), full_tx]),
-                        id: 1,
-                    };
-                    
-                    // Only prefetch if not already cached
-                    let cache_key = rpc_clone.get_cache_key(&request);
-                    let should_fetch = {
-                        let cache_result = rpc_clone.cache.try_lock();
-                        match cache_result {
-                            Ok(cache) => !cache.contains_key(&cache_key),
-                            Err(_) => false,
-                        }
-                    };
-                    
-                    if should_fetch {
-                        let _ = rpc_clone.execute_raw(request).await;
-                    }
-                }
-                
-                // Also prefetch next blocks for forward scanning
-                let next_block = current_block + offset;
-                let request = RpcRequest {
-                    jsonrpc: "2.0",
-                    method: "eth_getBlockByNumber", 
-                    params: json!([format!("0x{:x}", next_block), full_tx]),
-                    id: 1,
-                };
-                
-                let cache_key = rpc_clone.get_cache_key(&request);
-                let should_fetch = {
-                    let cache_result = rpc_clone.cache.try_lock();
-                    match cache_result {
-                        Ok(cache) => !cache.contains_key(&cache_key),
-                        Err(_) => false,
-                    }
-                };
-                
-                if should_fetch {
-                    let _ = rpc_clone.execute_raw(request).await;
-                }
-            }
-        });
-    }
 
     /// Fetch multiple blocks in a single batch request - much faster for recent blocks
     pub async fn get_blocks_by_numbers(

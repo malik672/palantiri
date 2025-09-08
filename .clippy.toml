@@ -1,0 +1,27 @@
+# Clippy configuration for enhanced linting
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
+
+# Documentation requirements
+missing-docs-in-private-items = false
+
+# Allowed complexity for types
+type-complexity-threshold = 250
+
+# String literal length limit
+max-suggested-slice-pattern-length = 3
+
+# Avoid specific lints that might be too strict
+avoid-breaking-exported-api = false
+
+# Enable additional restriction lints
+single-char-lifetime-names = true
+trivial-casts = true
+trivial-numeric-casts = true
+unused-lifetimes = true
+unused-qualifications = true
+
+# Performance lints
+vec-box = true
+redundant-clone = true

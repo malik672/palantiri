@@ -49,7 +49,9 @@ impl TransportBuilder {
         self
     }
 
-    pub fn build_http(self) -> HttpTransport { HttpTransport::new(self.urls[0]) }
+    pub fn build_http(self) -> HttpTransport {
+        HttpTransport::new(self.urls[0])
+    }
 
     pub fn build_http_hyper(self) -> HyperTransport {
         if self.urls.len() > 1 {
@@ -63,7 +65,9 @@ impl TransportBuilder {
         HttpTransport::new_with_config(param)
     }
 
-    pub fn build_reqwest(self) -> ReqwestTransport { ReqwestTransport::new(self.urls[0]) }
+    pub fn build_reqwest(self) -> ReqwestTransport {
+        ReqwestTransport::new(self.urls[0])
+    }
 
     pub fn build_reqwest_minimal(self) -> ReqwestTransport {
         ReqwestTransport::new_minimal(self.urls[0])

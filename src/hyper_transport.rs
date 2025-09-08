@@ -39,7 +39,9 @@ pub struct RequestPipeline {
 }
 
 impl Default for RequestPipeline {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RequestPipeline {

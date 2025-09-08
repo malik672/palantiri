@@ -159,7 +159,9 @@ impl<'a> RawLog<'a> {
     }
 
     #[inline]
-    pub fn data(&self) -> &'a [u8] { &self.data[self.data_field.0..self.data_field.1] }
+    pub fn data(&self) -> &'a [u8] {
+        &self.data[self.data_field.0..self.data_field.1]
+    }
 
     #[inline]
     pub fn block_number(&self) -> U64 {

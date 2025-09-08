@@ -5,6 +5,7 @@ pub mod transport;
 pub mod parser;
 pub mod hyper_transport;
 pub mod hyper_rpc;
+pub mod reqwest_transport;
 
 
 

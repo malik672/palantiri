@@ -15,11 +15,11 @@ use crate::RpcError;
 
 const DURATION_TIMEOUT: Duration = std::time::Duration::from_secs(30);
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
-const CONNECTION_TIMEOUT: Duration = Duration::from_secs(3);
-const MAX_IDLE_POOL: usize = 200;
+const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_IDLE_POOL: usize = 20;
 const TCP_KEEPALIVE: Duration = Duration::from_secs(60);
-const HAPPY_EYEBALLS_TIMEOUT: Duration = Duration::from_millis(300);
-const MAX_CONCURRENT_REQUESTS: usize = 50;
+const HAPPY_EYEBALLS_TIMEOUT: Duration = Duration::from_millis(100);
+const MAX_CONCURRENT_REQUESTS: usize = 100;
 const PIPELINE_BUFFER_SIZE: usize = 32;
 
 type HttpClient = hyper_util::client::legacy::Client<
@@ -107,10 +107,10 @@ impl HyperTransport {
             let http_executor = TokioExecutor::new();
 
             let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-            http_connector.set_connect_timeout(Some(CONNECTION_TIMEOUT));
-            http_connector.set_keepalive(Some(TCP_KEEPALIVE));
+            http_connector.set_connect_timeout(Some(Duration::from_millis(2000)));
+            http_connector.set_keepalive(Some(Duration::from_secs(90)));
             http_connector.set_nodelay(true);
-            http_connector.set_happy_eyeballs_timeout(Some(HAPPY_EYEBALLS_TIMEOUT));
+            http_connector.set_happy_eyeballs_timeout(Some(Duration::from_millis(100)));
             http_connector.set_reuse_address(true);
             http_connector.enforce_http(false);
 
@@ -119,12 +119,11 @@ impl HyperTransport {
                 .expect("Failed to load native root certificates")
                 .https_or_http()
                 .enable_http1()
-                .enable_http2()
                 .wrap_connector(http_connector);
 
             let client = hyper_util::client::legacy::Client::builder(http_executor)
-                .pool_idle_timeout(DURATION_TIMEOUT)
-                .pool_max_idle_per_host(MAX_IDLE_POOL)
+                .pool_idle_timeout(Duration::from_secs(90))
+                .pool_max_idle_per_host(100)
                 .retry_canceled_requests(false)
                 .build(https_connector);
 
@@ -134,20 +133,12 @@ impl HyperTransport {
 
         let pipeline = Arc::new(RequestPipeline::new());
         
-        let transport = Self {
+        Self {
             client: client.clone(),
             primary_url: url,
             fallback_urls: Vec::new(),
             pipeline: pipeline.clone(),
-        };
-        
-        let pipeline_clone = pipeline.clone();
-        let transport_clone = transport.clone();
-        tokio::spawn(async move {
-            RequestPipeline::start_processing(pipeline_clone, transport_clone).await;
-        });
-        
-        transport
+        }
     }
 
     pub fn new_with_fallbacks(primary_url: &'static str, fallback_urls: Vec<&'static str>) -> Self {
@@ -157,10 +148,10 @@ impl HyperTransport {
             let http_executor = TokioExecutor::new();
 
             let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-            http_connector.set_connect_timeout(Some(CONNECTION_TIMEOUT));
-            http_connector.set_keepalive(Some(TCP_KEEPALIVE));
+            http_connector.set_connect_timeout(Some(Duration::from_millis(2000)));
+            http_connector.set_keepalive(Some(Duration::from_secs(90)));
             http_connector.set_nodelay(true);
-            http_connector.set_happy_eyeballs_timeout(Some(HAPPY_EYEBALLS_TIMEOUT));
+            http_connector.set_happy_eyeballs_timeout(Some(Duration::from_millis(100)));
             http_connector.set_reuse_address(true);
             http_connector.enforce_http(false);
 
@@ -169,12 +160,11 @@ impl HyperTransport {
                 .expect("Failed to load native root certificates")
                 .https_or_http()
                 .enable_http1()
-                .enable_http2()
                 .wrap_connector(http_connector);
 
             let client = hyper_util::client::legacy::Client::builder(http_executor)
-                .pool_idle_timeout(DURATION_TIMEOUT)
-                .pool_max_idle_per_host(MAX_IDLE_POOL)
+                .pool_idle_timeout(Duration::from_secs(90))
+                .pool_max_idle_per_host(100)
                 .retry_canceled_requests(false)
                 .build(https_connector);
 
@@ -184,30 +174,22 @@ impl HyperTransport {
 
         let pipeline = Arc::new(RequestPipeline::new());
         
-        let transport = Self {
+        Self {
             client: client.clone(),
             primary_url,
             fallback_urls,
             pipeline: pipeline.clone(),
-        };
-        
-        let pipeline_clone = pipeline.clone();
-        let transport_clone = transport.clone();
-        tokio::spawn(async move {
-            RequestPipeline::start_processing(pipeline_clone, transport_clone).await;
-        });
-        
-        transport
+        }
     }
 
     pub async fn execute_single_request(&self, request: &[u8]) -> Result<Vec<u8>, RpcError> {
+        let body = http_body_util::Full::new(Bytes::copy_from_slice(request));
+        
         let req = hyper::Request::builder()
             .method(hyper::Method::POST)
             .uri(self.primary_url)
             .header(hyper::header::CONTENT_TYPE, CONTENT_TYPE_JSON)
-            .header(hyper::header::CONNECTION, "keep-alive")
-            .header("User-Agent", "palantiri/0.1.0")
-            .body(http_body_util::Full::new(Bytes::from(request.to_vec())))
+            .body(body)
             .map_err(|e| RpcError::Transport(format!("Failed to build request: {}", e)))?;
 
         let response = self
@@ -220,14 +202,12 @@ impl HyperTransport {
             return Err(RpcError::Transport(format!("HTTP error {}", response.status())));
         }
 
-        let body_bytes = response
-            .into_body()
-            .collect()
-            .await
+        let body = response.into_body();
+        let body_bytes = body.collect().await
             .map_err(|e| RpcError::Transport(e.to_string()))?
             .to_bytes();
 
-        Ok(body_bytes.to_vec())
+        Ok(body_bytes.into())
     }
 
     async fn try_request(&self, url: &str, request: &[u8]) -> Result<Vec<u8>, RpcError> {
@@ -236,7 +216,7 @@ impl HyperTransport {
             .uri(url)
             .header(hyper::header::CONTENT_TYPE, CONTENT_TYPE_JSON)
             .header(hyper::header::CONNECTION, "keep-alive")
-            .body(http_body_util::Full::new(Bytes::from(request.to_vec())))
+            .body(http_body_util::Full::new(Bytes::copy_from_slice(request)))
             .map_err(|e| RpcError::Transport(format!("Failed to build request: {}", e)))?;
 
         let response = self
@@ -249,14 +229,12 @@ impl HyperTransport {
             return Err(RpcError::Transport(format!("HTTP error {}", response.status())));
         }
 
-        let body_bytes = response
-            .into_body()
-            .collect()
-            .await
+        let body = response.into_body();
+        let body_bytes = body.collect().await
             .map_err(|e| RpcError::Transport(e.to_string()))?
             .to_bytes();
 
-        Ok(body_bytes.to_vec())
+        Ok(body_bytes.into())
     }
 }
 
@@ -280,10 +258,8 @@ impl Transport for HyperTransport {
             .await
             .map_err(|e| RpcError::Transport(format!("Request failed: {}", e)))?;
 
-        let body_bytes = response
-            .into_body()
-            .collect()
-            .await
+        let body = response.into_body();
+        let body_bytes = body.collect().await
             .map_err(|e| RpcError::Transport(e.to_string()))?
             .to_bytes();
 
@@ -310,11 +286,9 @@ impl Transport for HyperTransport {
             return Err(RpcError::Transport(format!("HTTP error {}", response.status())));
         }
 
-        // Use optimized body collection
-        let body_bytes = response
-            .into_body()
-            .collect()
-            .await
+        // Direct body collection without intermediate conversion
+        let body = response.into_body();
+        let body_bytes = body.collect().await
             .map_err(|e| RpcError::Transport(e.to_string()))?
             .to_bytes();
 
@@ -322,7 +296,7 @@ impl Transport for HyperTransport {
     }
 
     async fn hyper_execute_bytes(&self, request: Vec<u8>) -> Result<Vec<u8>, RpcError> {
-        self.pipeline.enqueue_request(request).await
+        self.execute_single_request(&request).await
     }
 }
 

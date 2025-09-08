@@ -271,9 +271,6 @@ impl RpcClient {
 
         let response_bytes: Vec<u8> = self.execute_raw(request).await?;
 
-        // Trigger predictive prefetching in background
-        self.maybe_prefetch_adjacent_blocks(number, full_tx);
-
         match parse_block(&response_bytes) {
             Some(block) => Ok(Some(block)),
             None => Ok(None),
@@ -731,67 +728,15 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        let cache_key = self.get_cache_key(&request);
-        
-        // Check cache first if this request type should be cached
-        if self.should_cache(request.method) {
-            if let Ok(mut cache) = self.cache.try_lock() {
-                if let Some(entry) = cache.get(&cache_key) {
-                    // Cache entries expire after 30 seconds for recent blocks
-                    if entry.timestamp.elapsed() < Duration::from_secs(30) {
-                        return Ok(entry.data.clone());
-                    } else {
-                        cache.remove(&cache_key);
-                    }
-                }
-            }
-        }
-
         self.execute_raw_internal(request).await
     }
 
     async fn execute_raw_internal(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        // Pre-allocate with larger capacity based on typical request sizes
-        let mut buffer = Vec::with_capacity(512);
-        
-        // Build JSON more efficiently
-        buffer.extend_from_slice(b"{\"jsonrpc\":\"");
-        buffer.extend_from_slice(request.jsonrpc.as_bytes());
-        buffer.extend_from_slice(b"\",\"method\":\"");
-        buffer.extend_from_slice(request.method.as_bytes());
-        buffer.extend_from_slice(b"\",\"params\":");
-        
-        // Serialize params directly into buffer - this is already optimal
-        serde_json::to_writer(&mut buffer, &request.params)
+        // Use standard serialization - it's actually faster
+        let json_request = serde_json::to_vec(&request)
             .map_err(|e| RpcError::Parse(e.to_string()))?;
-            
-        buffer.extend_from_slice(b",\"id\":");
-        
-        // Optimize integer writing
-        let id_str = request.id.to_string();
-        buffer.extend_from_slice(id_str.as_bytes());
-        buffer.push(b'}');
 
-        // Use a safer approach - create new transport method that takes Vec<u8>
-        let response = self.transport.hyper_execute_bytes(buffer).await?;
-
-        // Cache the response if appropriate
-        if self.should_cache(request.method) {
-            let cache_key = self.get_cache_key(&request);
-            
-            if let Ok(mut cache) = self.cache.try_lock() {
-                cache.insert(cache_key, CacheEntry {
-                    data: response.clone(),
-                    timestamp: Instant::now(),
-                });
-                
-                // Clean old entries occasionally (keep cache size manageable)
-                if cache.len() > 1000 {
-                    let now = Instant::now();
-                    cache.retain(|_, entry| now.duration_since(entry.timestamp) < Duration::from_secs(300));
-                }
-            }
-        }
+        let response = self.transport.hyper_execute_bytes(json_request).await?;
 
         Ok(response)
     }

@@ -4,7 +4,7 @@
 cognitive-complexity-threshold = 30
 
 # Documentation requirements
-missing-docs-in-private-items = false
+missing-docs-in-crate-items = false
 
 # Allowed complexity for types
 type-complexity-threshold = 250
@@ -15,13 +15,16 @@ max-suggested-slice-pattern-length = 3
 # Avoid specific lints that might be too strict
 avoid-breaking-exported-api = false
 
-# Enable additional restriction lints
-single-char-lifetime-names = true
-trivial-casts = true
-trivial-numeric-casts = true
-unused-lifetimes = true
-unused-qualifications = true
+# Function parameters threshold
+max-fn-params-bools = 3
+too-many-arguments-threshold = 7
 
-# Performance lints
-vec-box = true
-redundant-clone = true
+# Size thresholds
+trivial-copy-size-limit = 128
+pass-by-value-size-limit = 256
+
+# Allow some common patterns
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true

@@ -1,11 +1,11 @@
+use alloy::primitives::{B256, U256, U64};
 use palantiri::parser::{
     block_parser::parse_block,
-    log_parser::parse_logs,
-    tx_parser::parse_transaction,
     lib::{hex_to_b256, hex_to_u256, hex_to_u64},
+    log_parser::parse_logs,
+    parser_for_small_response::{Generic, RawFee},
+    tx_parser::parse_transaction,
 };
-use alloy::primitives::{B256, U256, U64};
-use palantiri::parser::parser_for_small_response::{Generic, RawFee};
 
 fn b256_of(hex64: &str) -> B256 {
     // helper to construct a 0x-prefixed 32-byte hex into B256

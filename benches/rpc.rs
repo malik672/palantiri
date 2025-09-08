@@ -1,8 +1,15 @@
-use ::palantiri::{transport::http::TransportBuilder, hyper_rpc::RpcClient as HyperRpcClient};
-use alloy::{eips::BlockNumberOrTag, providers::{Provider, ProviderBuilder}};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
+
+use ::palantiri::{hyper_rpc::RpcClient as HyperRpcClient, transport::http::TransportBuilder};
+use alloy::{
+    eips::BlockNumberOrTag,
+    providers::{Provider, ProviderBuilder},
+};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
-use std::{sync::{atomic::{AtomicU64, Ordering}}, time::Duration};
 
 // Standard benchmark configuration
 const SAMPLE_SIZE: usize = 20;
@@ -14,49 +21,45 @@ pub fn benchmark_alloy(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let rpc_url = RPC_URL.parse().unwrap();
     let provider = ProviderBuilder::new().on_http(rpc_url);
-    
+
     let block_counter = AtomicU64::new(STARTING_BLOCK);
-    
+
     let mut group = c.benchmark_group("ethereum_rpc_comparison");
     group.sample_size(SAMPLE_SIZE);
     group.measurement_time(MEASUREMENT_TIME);
-    
+
     group.bench_function("alloy_get_block", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let block_num = block_counter.fetch_sub(1, Ordering::SeqCst);
-                let result = provider
-                    .get_block_by_number(BlockNumberOrTag::Number(block_num))
-                    .await;
-                
+                let result =
+                    provider.get_block_by_number(BlockNumberOrTag::Number(block_num)).await;
+
                 match result {
                     Ok(block) => black_box(block),
                     Err(e) => {
                         eprintln!("Alloy error fetching block {}: {}", block_num, e);
                         black_box(None)
-                    }
+                    },
                 }
             })
         });
     });
-    
+
     group.finish();
 }
 
 pub fn benchmark_palantiri(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
-    let rpc = HyperRpcClient::new(
-        TransportBuilder::new(RPC_URL)
-            .build_http_hyper(),
-    );
-    
+
+    let rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
+
     let block_counter = AtomicU64::new(STARTING_BLOCK);
-    
+
     let mut group = c.benchmark_group("ethereum_rpc_comparison");
     group.sample_size(SAMPLE_SIZE);
     group.measurement_time(MEASUREMENT_TIME);
-    
+
     group.bench_function("palantiri_get_block", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -66,61 +69,60 @@ pub fn benchmark_palantiri(c: &mut Criterion) {
             })
         });
     });
-    
+
     group.finish();
 }
 
 pub fn benchmark_concurrent_alloy(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let mut group = c.benchmark_group("concurrent_requests");
     group.sample_size(10);
     group.measurement_time(MEASUREMENT_TIME);
-    
+
     group.bench_function("alloy_concurrent_10", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let rpc_url = RPC_URL.parse().unwrap();
                 let provider = ProviderBuilder::new().on_http(rpc_url);
-                
+
                 let mut handles = Vec::new();
                 let start_block = STARTING_BLOCK;
-                
+
                 for i in 0..10 {
                     let provider = provider.clone();
                     let handle = tokio::spawn(async move {
-                        provider.get_block_by_number(BlockNumberOrTag::Number(start_block - i)).await
+                        provider
+                            .get_block_by_number(BlockNumberOrTag::Number(start_block - i))
+                            .await
                     });
                     handles.push(handle);
                 }
-                
+
                 let results = futures::future::join_all(handles).await;
                 black_box(results)
             })
         });
     });
-    
+
     group.finish();
 }
 
 pub fn benchmark_concurrent_palantiri(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let mut group = c.benchmark_group("concurrent_requests");
     group.sample_size(10);
     group.measurement_time(MEASUREMENT_TIME);
-    
+
     group.bench_function("palantiri_concurrent_10", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let rpc = HyperRpcClient::new(
-                    TransportBuilder::new(RPC_URL)
-                        .build_http_hyper(),
-                );
-                
+                let rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
+
                 let mut handles = Vec::new();
                 let start_block = STARTING_BLOCK;
-                
+
                 for i in 0..10 {
                     let rpc = rpc.clone();
                     let handle = tokio::spawn(async move {
@@ -128,13 +130,13 @@ pub fn benchmark_concurrent_palantiri(c: &mut Criterion) {
                     });
                     handles.push(handle);
                 }
-                
+
                 let results = futures::future::join_all(handles).await;
                 black_box(results)
             })
         });
     });
-    
+
     group.finish();
 }
 

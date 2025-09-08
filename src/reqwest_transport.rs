@@ -2,8 +2,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::{Client, ClientBuilder};
 
-use crate::hyper_rpc::Transport;
-use crate::RpcError;
+use crate::{hyper_rpc::Transport, RpcError};
 
 #[derive(Debug, Clone)]
 pub struct ReqwestTransport {
@@ -23,7 +22,7 @@ impl ReqwestTransport {
             url: url.to_string(),
         }
     }
-    
+
     /// Create transport with minimal configuration (like Alloy uses)
     pub fn new_minimal(url: &str) -> Self {
         let client = Client::new(); // Use all defaults like Alloy

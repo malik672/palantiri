@@ -31,7 +31,8 @@ serde = "1.0.219"
 serde_json = "1.0.140"
 thiserror = "2.0.12"
 tokio = {version = "1.42.0", features = ["rt-multi-thread", "full"]}
-tower = { version = "0.5.2", features = ["limit"] }
+tower = { version = "0.5.2", features = ["limit", "buffer", "timeout", "retry", "load-shed", "util"] }
+tower-http = { version = "0.6.6", features = ["full"] }
 tracing = "0.1.41"
 hickory-resolver = "0.24"
 webpki-roots = "0.26.10"
@@ -54,4 +55,8 @@ debug = true
 
 [[bench]]
  name="alloy_vs_palantiri"
+ harness = false
+
+[[bench]]
+ name="tower_performance"
  harness = false

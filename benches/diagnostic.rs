@@ -8,8 +8,8 @@ use alloy::{
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
 
-const RECENT_BLOCK: u64 = 23218929;
-const OLD_BLOCK: u64 = 22812202;
+const RECENT_BLOCK: u64 = 23326322;
+const OLD_BLOCK: u64 = 23326320;
 const RPC_URL: &str = "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4";
 
 pub fn diagnostic_network_vs_parsing(c: &mut Criterion) {

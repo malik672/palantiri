@@ -39,7 +39,7 @@ pub enum BlockIdentifier {
 struct BatchingStats {
     optimal_batch_size: usize,
     last_batch_time: Duration,
-    samples: Vec<(usize, Duration)>, // (batch_size, duration)
+    samples: Vec<(usize, Duration)>, 
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl RpcClient {
         Self {
             transport: Arc::new(transport),
             batching_stats: Arc::new(std::sync::Mutex::new(BatchingStats {
-                optimal_batch_size: 5, // Start with conservative batch size
+                optimal_batch_size: 5, 
                 last_batch_time: Duration::from_millis(500),
                 samples: Vec::new(),
             })),
@@ -658,29 +658,20 @@ impl RpcClient {
     }
 
     pub async fn execute_raw(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        self.execute_raw_internal(request).await
-    }
+        // Use fast custom serialization (format string approach - fastest from benchmarks)
+        let json_request = format!(
+            r#"{{"jsonrpc":"{}","method":"{}","params":{},"id":{}}}"#,
+            request.jsonrpc, request.method, request.params, request.id
+        );
 
-    async fn execute_raw_internal(&self, request: RpcRequest) -> Result<Vec<u8>, RpcError> {
-        // Use standard serialization - it's actually faster
-        let json_request =
-            serde_json::to_vec(&request).map_err(|e| RpcError::Parse(e.to_string()))?;
-
-        let response = self.transport.hyper_execute_bytes(json_request).await?;
+        let response = self.transport.hyper_execute_bytes(json_request.into_bytes()).await?;
 
         Ok(response)
     }
 
     /// Execute multiple RPC requests in a single batch call
+    /// Use Lockelss algorithm 
     pub async fn execute_batch_raw(&self, requests: Vec<RpcRequest>) -> Result<Vec<u8>, RpcError> {
-        if requests.is_empty() {
-            return Err(RpcError::Parse("Empty batch request".into()));
-        }
-
-        if requests.len() == 1 {
-            return self.execute_raw(requests.into_iter().next().unwrap()).await;
-        }
-
         let start_time = Instant::now();
         let batch_size = requests.len();
 

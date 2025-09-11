@@ -6,6 +6,9 @@ pub mod hyper_rpc;
 pub mod hyper_transport;
 pub mod parser;
 pub mod reqwest_transport;
+pub mod tower_transport;
+pub mod direct_transport;
+pub mod direct_reqwest_transport;
 pub mod transport;
 
 #[derive(Debug)]

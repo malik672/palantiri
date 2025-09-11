@@ -4,7 +4,7 @@ use ::palantiri::{hyper_rpc::RpcClient as HyperRpcClient, transport::http::Trans
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
 
-const RECENT_BLOCKS: [u64; 5] = [23218929, 23218928, 23218927, 23218926, 23218925];
+const RECENT_BLOCKS: [u64; 5] = [23326322, 23326321, 23326320, 23326319, 23326318];
 const RPC_URL: &str = "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4";
 
 pub fn benchmark_batching(c: &mut Criterion) {

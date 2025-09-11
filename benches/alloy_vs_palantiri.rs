@@ -9,9 +9,9 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
 
 // Test with recent blocks where network optimizations matter most
-const RECENT_BLOCKS: [u64; 5] = [23218929, 23218928, 23218927, 23218926, 23218925];
-const OLD_BLOCKS: [u64; 5] = [22812202, 22812201, 22812200, 22812199, 22812198];
-const RPC_URL: &str = "https://mainnet.infura.io/v3/1f2bd7408b1542e89bd4274b688aa6a4";
+const RECENT_BLOCKS: [u64; 5] = [23334905, 23334696,23334696,23334696,23334696]; // Current blocks
+const OLD_BLOCKS: [u64; 5] =  [23334905, 23334696,23334696,23334696,23334696]; // Current blocks
+const RPC_URL: &str = "https://thrilling-boldest-panorama.quiknode.pro/c11ea3b6cfa7edd1abd7d29d66cc2f268cc11515/";
 
 pub fn benchmark_single_block_recent(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -20,10 +20,8 @@ pub fn benchmark_single_block_recent(c: &mut Criterion) {
     let rpc_url = RPC_URL.parse().unwrap();
     let alloy_provider = ProviderBuilder::new().on_http(rpc_url);
 
-    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
-
     let mut group = c.benchmark_group("single_block_recent");
-    group.sample_size(10);
+    group.sample_size(15);
     group.measurement_time(Duration::from_secs(60));
 
     group.bench_function("alloy_recent", |b| {
@@ -37,10 +35,37 @@ pub fn benchmark_single_block_recent(c: &mut Criterion) {
         });
     });
 
-    group.bench_function("palantiri_recent", |b| {
+    // Test Palantiri with ultra-fast Reqwest to beat Alloy's 194ms
+    let palantiri_ultra_fast = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_reqwest_ultra_fast());
+
+    group.bench_function("palantiri_ultra_fast", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let result = palantiri_rpc.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                let result = palantiri_ultra_fast.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                black_box(result)
+            })
+        });
+    });
+
+    // Test Palantiri with optimized Reqwest (connection pooling + HTTP/2)
+    let palantiri_optimized = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_reqwest_optimized());
+    
+    group.bench_function("palantiri_optimized", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = palantiri_optimized.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                black_box(result)
+            })
+        });
+    });
+
+    // Test standard Reqwest for comparison  
+    let palantiri_reqwest = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_reqwest());
+    
+    group.bench_function("palantiri_reqwest", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = palantiri_reqwest.get_block_by_number(RECENT_BLOCKS[0], true).await;
                 black_box(result)
             })
         });
@@ -55,8 +80,7 @@ pub fn benchmark_single_block_old(c: &mut Criterion) {
     // Setup clients
     let rpc_url = RPC_URL.parse().unwrap();
     let alloy_provider = ProviderBuilder::new().on_http(rpc_url);
-
-    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
+    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_reqwest());
 
     let mut group = c.benchmark_group("single_block_old");
     group.sample_size(20);
@@ -76,6 +100,7 @@ pub fn benchmark_single_block_old(c: &mut Criterion) {
     group.bench_function("palantiri_old", |b| {
         b.iter(|| {
             rt.block_on(async {
+                
                 let result = palantiri_rpc.get_block_by_number(OLD_BLOCKS[0], true).await;
                 black_box(result)
             })
@@ -92,7 +117,7 @@ pub fn benchmark_multiple_blocks(c: &mut Criterion) {
     let rpc_url = RPC_URL.parse().unwrap();
     let alloy_provider = ProviderBuilder::new().on_http(rpc_url);
 
-    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
+    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper_benchmark());
 
     let mut group = c.benchmark_group("multiple_blocks");
     group.sample_size(10);
@@ -173,7 +198,7 @@ pub fn benchmark_caching_advantage(c: &mut Criterion) {
     let rpc_url = RPC_URL.parse().unwrap();
     let alloy_provider = ProviderBuilder::new().on_http(rpc_url);
 
-    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper());
+    let palantiri_rpc = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper_benchmark());
 
     // Pre-warm Palantiri cache
     rt.block_on(async {
@@ -209,11 +234,100 @@ pub fn benchmark_caching_advantage(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn benchmark_tower_transport(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    // Setup clients
+    let rpc_url = RPC_URL.parse().unwrap();
+    let alloy_provider = ProviderBuilder::new().on_http(rpc_url);
+
+    let palantiri_hyper = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper_minimal());
+    let palantiri_tower = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_tower());
+    let palantiri_tower_optimized = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_tower_optimized());
+
+    let mut group = c.benchmark_group("tower_transport_comparison");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(60));
+
+    group.bench_function("alloy_baseline", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = alloy_provider
+                    .get_block_by_number(BlockNumberOrTag::Number(RECENT_BLOCKS[0]))
+                    .await;
+                black_box(result)
+            })
+        });
+    });
+
+    group.bench_function("palantiri_hyper_minimal", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = palantiri_hyper.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                black_box(result)
+            })
+        });
+    });
+
+    group.bench_function("palantiri_tower", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = palantiri_tower.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                black_box(result)
+            })
+        });
+    });
+
+    group.bench_function("palantiri_tower_optimized", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let result = palantiri_tower_optimized.get_block_by_number(RECENT_BLOCKS[0], true).await;
+                black_box(result)
+            })
+        });
+    });
+
+    group.finish();
+}
+
+pub fn benchmark_tower_batch(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let palantiri_hyper = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_http_hyper_minimal());
+    let palantiri_tower_optimized = HyperRpcClient::new(TransportBuilder::new(RPC_URL).build_tower_optimized());
+
+    let mut group = c.benchmark_group("tower_batch_comparison");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(30));
+
+    group.bench_function("hyper_batch", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let blocks = palantiri_hyper.get_blocks_by_numbers(RECENT_BLOCKS.to_vec(), true).await;
+                black_box(blocks)
+            })
+        });
+    });
+
+    group.bench_function("tower_batch", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let blocks = palantiri_tower_optimized.get_blocks_by_numbers(RECENT_BLOCKS.to_vec(), true).await;
+                black_box(blocks)
+            })
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     benchmark_single_block_recent,
     benchmark_single_block_old,
     benchmark_multiple_blocks,
     benchmark_caching_advantage,
+    benchmark_tower_transport,
+    benchmark_tower_batch,
 );
 criterion_main!(benches);

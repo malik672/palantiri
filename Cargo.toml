@@ -60,3 +60,7 @@ debug = true
 [[bench]]
  name="tower_performance"
  harness = false
+
+[[bench]]
+ name="serialization_benchmark"
+ harness = false

@@ -22,11 +22,10 @@ impl DirectReqwestTransport {
         
         debug!("Creating fresh reqwest client for direct transport request");
         
-        // Create a completely fresh client with no connection pooling
         let client = ClientBuilder::new()
             .timeout(Duration::from_secs(30))
             .tcp_nodelay(true)
-            .pool_max_idle_per_host(0) // NO connection reuse at all
+            .pool_max_idle_per_host(0) 
             .build()
             .map_err(|e| RpcError::Transport(format!("Failed to create reqwest client: {}", e)))?;
 

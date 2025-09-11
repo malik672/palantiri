@@ -29,7 +29,8 @@ static BENCHMARK_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::Atomic
 #[derive(Debug)]
 struct PipelineRequest {
     request: Vec<u8>,
-    #[allow(dead_code)] // Used in debug output
+    // Used in debug output
+    #[allow(dead_code)] 
     response_sender: oneshot::Sender<Result<Vec<u8>, RpcError>>,
 }
 
@@ -102,8 +103,7 @@ pub struct HyperTransport {
 }
 
 impl HyperTransport {
-    /// Create minimal HTTP client matching Alloy's configuration for maximum performance
-    pub fn new_minimal_like_alloy(url: &'static str) -> Self {
+    pub fn new_minimal(url: &'static str) -> Self {
         let client = CLIENT_POOL.get_or_init(|| {
             debug!("Creating minimal Alloy-style HTTP client");
 
@@ -111,11 +111,10 @@ impl HyperTransport {
             
             // Optimized HTTP connector - match reqwest defaults for best performance
             let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-            http_connector.set_nodelay(true); // Disable Nagle algorithm for low latency
-            http_connector.set_keepalive(Some(Duration::from_secs(30))); // Match reqwest default
-            http_connector.set_connect_timeout(Some(Duration::from_millis(30_000))); // 30s like reqwest
+            http_connector.set_nodelay(true); 
+            http_connector.set_keepalive(Some(Duration::from_secs(30))); 
+            http_connector.set_connect_timeout(Some(Duration::from_millis(30_000))); 
             
-            // Minimal HTTPS connector - match Alloy's approach
             let https_connector = HttpsConnectorBuilder::new()
                 .with_provider_and_webpki_roots(rustls::crypto::aws_lc_rs::default_provider())
                 .expect("Failed to load native root certificates")
@@ -126,8 +125,8 @@ impl HyperTransport {
             
             // Optimized client builder - balanced settings for performance
             let client = hyper_util::client::legacy::Client::builder(http_executor)
-                .pool_idle_timeout(Duration::from_secs(30)) // Match reqwest defaults
-                .pool_max_idle_per_host(32) // Conservative pool size
+                .pool_idle_timeout(Duration::from_secs(30)) 
+                .pool_max_idle_per_host(32)
                 .build(https_connector);
             
             info!("Minimal Alloy-style HTTP client created");
@@ -136,6 +135,7 @@ impl HyperTransport {
 
         // No request pipeline for minimal approach
         Self {
+            // remove clone
             client: client.clone(),
             primary_url: url,
             pipeline: Arc::new(RequestPipeline::new()),
@@ -150,10 +150,10 @@ impl HyperTransport {
             
             // Ultra-optimized HTTP connector - aggressive settings
             let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
-            http_connector.set_nodelay(true); // Disable Nagle
-            http_connector.set_keepalive(Some(Duration::from_secs(90))); // Longer keepalive
-            http_connector.set_connect_timeout(Some(Duration::from_millis(2000))); // Faster timeout
-            http_connector.set_happy_eyeballs_timeout(Some(Duration::from_millis(50))); // IPv6 fallback
+            http_connector.set_nodelay(true); 
+            http_connector.set_keepalive(Some(Duration::from_secs(90)));
+            http_connector.set_connect_timeout(Some(Duration::from_millis(2000))); 
+            http_connector.set_happy_eyeballs_timeout(Some(Duration::from_millis(50)));
             
             // Ultra-fast HTTPS connector 
             let https_connector = HttpsConnectorBuilder::new()
@@ -161,13 +161,13 @@ impl HyperTransport {
                 .expect("Failed to load native root certificates")
                 .https_or_http()
                 .enable_http1()
-                .enable_http2() // Critical for performance
+                .enable_http2() 
                 .wrap_connector(http_connector);
             
             // Aggressive connection pool settings
             let client = hyper_util::client::legacy::Client::builder(http_executor)
-                .pool_idle_timeout(Duration::from_secs(120)) // Keep connections alive longer
-                .pool_max_idle_per_host(64) // More pooled connections
+                .pool_idle_timeout(Duration::from_secs(120))
+                .pool_max_idle_per_host(64)
                 .build(https_connector);
                 
             info!("Ultra-fast HTTP client created to beat Alloy");
@@ -190,7 +190,7 @@ impl HyperTransport {
         
         let mut http_connector = hyper_util::client::legacy::connect::HttpConnector::new();
         http_connector.set_nodelay(true);
-        http_connector.set_keepalive(Some(Duration::from_secs(30))); // Allow some reuse like Alloy
+        http_connector.set_keepalive(Some(Duration::from_secs(30))); 
         http_connector.set_connect_timeout(Some(Duration::from_secs(10)));
         http_connector.set_happy_eyeballs_timeout(Some(Duration::from_millis(300)));
         
@@ -199,13 +199,12 @@ impl HyperTransport {
             .expect("Failed to load native root certificates")
             .https_or_http()
             .enable_http1()
-            .enable_http2() // Enable HTTP/2 like Alloy
+            .enable_http2() 
             .wrap_connector(http_connector);
         
-        // Minimal pooling client to match Alloy's approach
         let client = hyper_util::client::legacy::Client::builder(http_executor)
             .pool_idle_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(10) // Minimal pooling
+            .pool_max_idle_per_host(10)
             .build(https_connector);
 
         info!("Created realistic benchmark client with minimal connection reuse");

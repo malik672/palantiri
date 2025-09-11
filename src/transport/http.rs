@@ -65,7 +65,7 @@ impl TransportBuilder {
 
     /// Build minimal Alloy-style Hyper transport for maximum performance 
     pub fn build_http_hyper_minimal(self) -> HyperTransport {
-        HyperTransport::new_minimal_like_alloy(self.urls[0])
+        HyperTransport::new_minimal(self.urls[0])
     }
 
     /// Build ultra-fast Hyper transport to beat Alloy performance

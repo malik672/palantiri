@@ -9,8 +9,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::runtime::Runtime;
 
 // Test with recent blocks where network optimizations matter most
-const RECENT_BLOCKS: [u64; 5] = [23334696, 23334696,23334696,23334696,23334696]; // Current blocks
-const OLD_BLOCKS: [u64; 5] =  [23334696, 23334696,23334696,23334696,23334696]; // Current blocks
+const RECENT_BLOCKS: [u64; 5] = [23334905, 23334696,23334696,23334696,23334696]; // Current blocks
+const OLD_BLOCKS: [u64; 5] =  [23334905, 23334696,23334696,23334696,23334696]; // Current blocks
 const RPC_URL: &str = "https://thrilling-boldest-panorama.quiknode.pro/c11ea3b6cfa7edd1abd7d29d66cc2f268cc11515/";
 
 pub fn benchmark_single_block_recent(c: &mut Criterion) {
